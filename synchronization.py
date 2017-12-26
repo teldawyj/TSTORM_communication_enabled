@@ -20,6 +20,7 @@ class Lines(module.Module):
         self.frames=int(frames)
         self.cycles=int(cycles)
         self.exposure=int(exposure)
+        self.done=np.int(0)
         self.task = Task()
 
     def lists(self):
@@ -44,6 +45,7 @@ class Lines(module.Module):
 
         if self.cycles==0:
             self.task.CfgSampClkTiming("", 1000, DAQmx_Val_Rising, DAQmx_Val_ContSamps, 1000)
+            self.send_thread_flag = False
 
 
 
@@ -68,21 +70,18 @@ class Lines(module.Module):
 
     def process_message(self):
         while(self.process_thread_flag==True):
-            if self.message.find_message("lines")=="start lines"
+            if self.message.find_message("lines")=="start lines":
                 self.start()
-                self.send_thread_flag = True
                 self.process_thread_flag=False
-                self.message.send_message("lines","stop lines")
-                self.send_thread = threading.Thread(target=self.send_message, name="send_thread")
-                self.send_thread.start()
             elif self.message.find_message("lines")=="finished":
                 self.process_thread_flag=False
+                self.send_thread_flag=True
             else:
                 time.sleep(0.01)
 
     def send_message(self):
         while(self.send_thread_flag==True):
-            if self.task.IsTaskDone():#FIXME:check if this function works
+            if self.task.IsTaskDone(ctypes.byref(self.done)):
                 self.message.send_message("stage", "start stage")
                 self.message.send_message("lines", "stop lines")
                 self.send_thread_flag=False
