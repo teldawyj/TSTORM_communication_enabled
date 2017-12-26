@@ -55,13 +55,13 @@ class Stage(module.Module):
         #self.piezo_timer.start(20)
         self.ui.goButton.clicked.connect(lambda: self.GO())
         self.ui.piezo_go.clicked.connect(lambda: self.piezo_Abs())
-        self.ui.zRel_button.clicked.connect(lambda: self.piezo_Rel())
+        self.ui.zRel_button.clicked.connect(lambda: self.piezo_Rel(distance=float(self.ui.zReldoublespinbox.text())))
         self.ui.move_stage_in_record.clicked.connect(lambda:self.change_button())
 
 
     def change_button(self):
         self.processing_flag = True
-        self.move_distance=float(self.ui.record_move_range.text())
+        self.move_distance=0.0
         self.ui.move_stage_in_record.setText("running")
         processing_thread = threading.Thread(target=self.process_message, name="process message")
         processing_thread.start()
@@ -82,6 +82,8 @@ class Stage(module.Module):
         else:
             self.message.send_message("stage", "finished")
             self.message.send_message("lines", "finished")
+            self.ui.move_stage_in_record.setChecked(False)
+            self.ui.move_stage_in_record.setText("Set")
             return(0)
         time.sleep(0.01)
         self.message.send_message("stage", "stop stage")
@@ -94,7 +96,6 @@ class Stage(module.Module):
 
     def ZUP(self):
         self.handle_z.mRel(.1)
-        #self.message.add_message("stage","start stage move")
 
     def ZUPL(self):
         self.handle_z.mRel(.5)
@@ -176,7 +177,6 @@ class Stage(module.Module):
     def Exit(self):
         self.timer.stop()
         self.handle_x.cleanUpAPT()
-
         self.handle_y.cleanUpAPT()
         self.handle_z.cleanUpAPT()
         self.mcl_handle.shutDown()
@@ -184,11 +184,8 @@ class Stage(module.Module):
     def piezo_Abs(self):
         self.mcl_handle.moveTo(3,float(self.ui.piezo_doublespinbox.text()))
 
-    def piezo_Rel(self,distance=float(self.ui.zReldoublespinbox.text())):
+    def piezo_Rel(self,distance=0.0):
         self.mcl_handle.moveTo(3,distance+self.mcl_handle.getPosition(3))
-
-    def piezo_sequence(self, step):
-        self.mcl_handle.moveTo(3, step)
 
     def piezoinfo(self):
         self.ui.piezo_postext.setText("z_posi=" + str(format(self.mcl_handle.getPosition(3), '.3f')))
