@@ -75,6 +75,8 @@ class Lines(module.Module):
                 self.message.send_message("lines","stop lines")
                 self.send_thread = threading.Thread(target=self.send_message, name="send_thread")
                 self.send_thread.start()
+            elif self.message.find_message("lines")=="finished":
+                self.process_thread_flag=False
             else:
                 time.sleep(0.01)
 
