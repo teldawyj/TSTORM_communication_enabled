@@ -13,7 +13,8 @@ class Stage(module.Module):
         self.message=message
         self.ui=ui.stageUI()
         self.ui.setupUI()
-        self.processing_flag = True
+        self.processing_flag = None
+        self.move_distance=None
         '''self.handle_x = pyapt.APTMotor(83833850)
         self.handle_y = pyapt.APTMotor(83840820)
         self.handle_z = pyapt.APTMotor(83841441)
@@ -22,11 +23,11 @@ class Stage(module.Module):
         self.handle_z.setStageAxisInformation(-15, 2.4)
         self.mcl_handle = mcl.MCLStage(mcl_lib="c:/Program Files/Mad City Labs/NanoDrive/Madlib")
 
-        self.ui.xrangeLabel.setText(self.ui.xposLabel.text()+'min: ' +str(self.handle_x.getStageAxisInformation()[0]) +
+        self.ui.xrangeLabel.setText('x range: '+'min: ' +str(self.handle_x.getStageAxisInformation()[0]) +
                                   ',   max: ' + str(self.handle_x.getStageAxisInformation()[1]))
-        self.ui.yrangeLabel.setText(self.ui.yposLabel.text()+'min: ' +str(self.handle_y.getStageAxisInformation()[0]) +
+        self.ui.yrangeLabel.setText('y range: '+'min: ' +str(self.handle_y.getStageAxisInformation()[0]) +
                                 ',   max: ' + str(self.handle_y.getStageAxisInformation()[1]))
-        self.ui.zrangeLabel.setText(self.ui.zposLabel.text()+'min: ' +str(self.handle_z.getStageAxisInformation()[0]) +
+        self.ui.zrangeLabel.setText('z range: '+'min: ' +str(self.handle_z.getStageAxisInformation()[0]) +
                                 ',   max: ' + str(format(self.handle_z.getStageAxisInformation()[1], '.3f')))
         self.ui.Vlimit.setText('max_acc:' + str(self.handle_y.getVelocityParameterLimits()[0]) + ' max_V:' + str(
             format(self.handle_y.getVelocityParameterLimits()[1], '.2f')))
@@ -53,13 +54,17 @@ class Stage(module.Module):
         self.piezo_timer.timeout.connect(lambda: self.piezoinfo())
         #self.piezo_timer.start(20)
         self.ui.goButton.clicked.connect(lambda: self.GO())
-        self.ui.piezo_go.clicked.connect(lambda: self.piezo_GO())
+        self.ui.piezo_go.clicked.connect(lambda: self.piezo_Abs())
+        self.ui.zRel_button.clicked.connect(lambda: self.piezo_Rel())
         self.ui.move_stage_in_record.clicked.connect(lambda:self.change_button())
-        processing_thread = threading.Thread(target=self.process_message, name="process message")
-        processing_thread.start()
+
 
     def change_button(self):
+        self.processing_flag = True
+        self.move_distance=float(self.ui.record_move_range.text())
         self.ui.move_stage_in_record.setText("running")
+        processing_thread = threading.Thread(target=self.process_message, name="process message")
+        processing_thread.start()
 
     def process_message(self):
         while(self.ui.move_stage_in_record.isChecked() and self.processing_flag==True):
@@ -71,7 +76,13 @@ class Stage(module.Module):
                 time.sleep(0.01)
 
     def send_message(self):
-        self.piezo_GO(float(self.ui.record_move_range.text()))
+        if self.move_distance<float(self.ui.record_move_range.text()):
+            self.piezo_Rel(distance=1.00)
+            self.move_distance+=1
+        else:
+            self.message.send_message("stage", "finished")
+            self.message.send_message("lines", "finished")
+            return(0)
         time.sleep(0.01)
         self.message.send_message("stage", "stop stage")
         self.message.send_message("lines", "start lines")
@@ -170,8 +181,11 @@ class Stage(module.Module):
         self.handle_z.cleanUpAPT()
         self.mcl_handle.shutDown()
 
-    def piezo_GO(self,distance=float(self.ui.piezo_doublespinbox.text())):
-        self.mcl_handle.moveTo(3, distance)
+    def piezo_Abs(self):
+        self.mcl_handle.moveTo(3,float(self.ui.piezo_doublespinbox.text()))
+
+    def piezo_Rel(self,distance=float(self.ui.zReldoublespinbox.text())):
+        self.mcl_handle.moveTo(3,distance+self.mcl_handle.getPosition(3))
 
     def piezo_sequence(self, step):
         self.mcl_handle.moveTo(3, step)
