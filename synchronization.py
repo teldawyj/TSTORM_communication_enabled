@@ -81,7 +81,8 @@ class Lines(module.Module):
 
     def send_message(self):
         while(self.send_thread_flag==True):
-            if self.task.IsTaskDone(ctypes.byref(self.done)):
+            self.task.IsTaskDone(ctypes.byref(self.done))#FIXME: check this function
+            if self.done:
                 self.message.send_message("stage", "start stage")
                 self.message.send_message("lines", "stop lines")
                 self.send_thread_flag=False
