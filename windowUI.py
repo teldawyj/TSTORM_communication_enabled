@@ -12,7 +12,7 @@ class MainWindow(QWidget):
     def setupMainWindow(self):
         self.setWindowTitle("main window")
         self.setMinimumSize(QtCore.QSize(900, 700))
-        self.setMaximumSize(QtCore.QSize(2000, 2000))
+        self.setMaximumSize(QtCore.QSize(1000, 2000))
         self.gridLayout = QtWidgets.QGridLayout(self)
 # menu
         horizontalLayout_1 = QHBoxLayout()
@@ -155,7 +155,7 @@ class MainWindow(QWidget):
         # message label
         self.message_label = QLabel('message', self)
         horizontalLayout_8.addWidget(self.message_label)
-        self.gridLayout.addLayout(horizontalLayout_8, 7, 0, 1, 1)
+        self.gridLayout.addLayout(horizontalLayout_8, 7, 0, 1, 3)
 
         self.liveButton.setCheckable(True)
         self.recordButton.setCheckable(True)

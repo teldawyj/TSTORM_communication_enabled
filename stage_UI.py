@@ -1,12 +1,13 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 import sys
-
+import os
 
 class stageUI(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
-        self.setupUI()
-        self.show()
+#        self.setupUI()
+#        self.show()
+        self.path=os.path.dirname(__file__)
 
     def setupUI(self):
         self.setWindowTitle('stage')
@@ -29,14 +30,14 @@ class stageUI(QtWidgets.QWidget):
         self.horizontalLayout = QtWidgets.QHBoxLayout(self.zGroupBox)
         self.zupButton = QtWidgets.QPushButton(self.zGroupBox)
         self.zupButton.setIcon(
-            QtGui.QIcon("E:\storm-control-python3_pyqt5\storm_control\hal4000\icons\\1uparrow-128.png"))
+            QtGui.QIcon("D:\storm-control-python3_pyqt5\storm-control-python3_pyqt5\storm_control\hal4000\icons\\1uparrow-128.png"))
         self.zupButton.setIconSize(QtCore.QSize(40, 40))
         self.horizontalLayout.addWidget(self.zupButton)
         self.horizontalLayout.addItem(spacerItem)
 
         self.zupLButton = QtWidgets.QPushButton(self.zGroupBox)
         self.zupLButton.setIcon(
-            QtGui.QIcon("E:\storm-control-python3_pyqt5\storm_control\hal4000\icons\\2uparrow-128.png"))
+            QtGui.QIcon("D:\storm-control-python3_pyqt5\storm-control-python3_pyqt5\storm_control\hal4000\icons\\2uparrow-128.png"))
         self.zupLButton.setIconSize(QtCore.QSize(40, 40))
         self.horizontalLayout.addWidget(self.zupLButton)
         self.horizontalLayout.addItem(spacerItem)
@@ -45,14 +46,14 @@ class stageUI(QtWidgets.QWidget):
         self.horizontalLayout_2 = QtWidgets.QHBoxLayout(self.zGroupBox)
         self.zdownButton = QtWidgets.QPushButton(self.zGroupBox)
         self.zdownButton.setIcon(
-            QtGui.QIcon("E:\storm-control-python3_pyqt5\storm_control\hal4000\icons\\1downarrow1-128.png"))
+            QtGui.QIcon("D:\storm-control-python3_pyqt5\storm-control-python3_pyqt5\storm_control\hal4000\icons\\1downarrow1-128.png"))
         self.zdownButton.setIconSize(QtCore.QSize(40, 40))
         self.horizontalLayout_2.addWidget(self.zdownButton)
         self.horizontalLayout_2.addItem(spacerItem)
 
         self.zdownLButton = QtWidgets.QPushButton(self.zGroupBox)
         self.zdownLButton.setIcon(
-            QtGui.QIcon("E:\storm-control-python3_pyqt5\storm_control\hal4000\icons\\2dowarrow-128.png"))
+            QtGui.QIcon("D:\storm-control-python3_pyqt5\storm-control-python3_pyqt5\storm_control\hal4000\icons\\2dowarrow-128.png"))
         self.zdownLButton.setIconSize(QtCore.QSize(40, 40))
         self.horizontalLayout_2.addWidget(self.zdownLButton)
         self.horizontalLayout_2.addItem(spacerItem)
@@ -64,12 +65,12 @@ class stageUI(QtWidgets.QWidget):
         # gridlayout--verticallayout_5--upbuttons
         self.verticalLayout_5 = QtWidgets.QVBoxLayout(self)
         self.upLButton = QtWidgets.QPushButton(self)
-        self.upLButton.setIcon(QtGui.QIcon("E:\storm-control-python3_pyqt5\storm_control\hal4000\icons\\2uparrow-128.png"))
+        self.upLButton.setIcon(QtGui.QIcon("D:\storm-control-python3_pyqt5\storm-control-python3_pyqt5\storm_control\hal4000\icons\\2uparrow-128.png"))
         self.upLButton.setIconSize(QtCore.QSize(56, 56))
         self.verticalLayout_5.addWidget(self.upLButton)
         self.upSButton = QtWidgets.QPushButton(self)
         self.upSButton.setIcon(
-            QtGui.QIcon("E:\storm-control-python3_pyqt5\storm_control\hal4000\icons\\1uparrow-128.png"))
+            QtGui.QIcon("D:\storm-control-python3_pyqt5\storm-control-python3_pyqt5\storm_control\hal4000\icons\\1uparrow-128.png"))
         self.upSButton.setIconSize(QtCore.QSize(56, 56))
         self.verticalLayout_5.addWidget(self.upSButton)
         self.gridLayout.addLayout(self.verticalLayout_5, 0, 1, 1, 1)
@@ -78,7 +79,7 @@ class stageUI(QtWidgets.QWidget):
         self.posGroupBox = QtWidgets.QGroupBox("position",self)
         self.verticalLayout_2 = QtWidgets.QVBoxLayout(self.posGroupBox)
         self.horizontalLayout_3 = QtWidgets.QHBoxLayout(self)
-        self.xposLabel = QtWidgets.QLabel('x posi:  ', self.posGroupBox)
+        self.xposLabel = QtWidgets.QLabel('x posi: 1,26 ', self.posGroupBox)
         self.horizontalLayout_3.addWidget(self.xposLabel)
         self.verticalLayout_2.addLayout(self.horizontalLayout_3)
 
@@ -90,7 +91,7 @@ class stageUI(QtWidgets.QWidget):
         self.horizontalLayout_14 = QtWidgets.QHBoxLayout()
         self.zposLabel = QtWidgets.QLabel('z posi:  ', self.posGroupBox)
         self.horizontalLayout_14.addWidget(self.zposLabel)
-        self.zposText = QtWidgets.QLabel(self.posGroupBox)
+        #self.zposText = QtWidgets.QLabel(self.posGroupBox)
         self.verticalLayout_2.addLayout(self.horizontalLayout_14)
         self.verticalLayout_2.addItem(spacerItem)
 
@@ -109,6 +110,7 @@ class stageUI(QtWidgets.QWidget):
         self.horizontalLayout_range3.addWidget(self.zrangeLabel)
         self.verticalLayout_2.addLayout(self.horizontalLayout_range3)
         self.verticalLayout_2.addItem(spacerItem)
+        self.posGroupBox.setLayout(self.verticalLayout_2)
         self.gridLayout.addWidget(self.posGroupBox, 0, 2, 1, 1)
 
 # gridlayout--horizontallayout_6--leftbuttons
@@ -122,7 +124,7 @@ class stageUI(QtWidgets.QWidget):
         self.leftLButton = QtWidgets.QPushButton(self)
         self.leftLButton.setMinimumSize(QtCore.QSize(68, 66))
         self.leftLButton.setIcon(
-            QtGui.QIcon("E:\storm-control-python3_pyqt5\storm_control\hal4000\icons\\2leftarrow-128.png"))
+            QtGui.QIcon("D:\storm-control-python3_pyqt5\storm-control-python3_pyqt5\storm_control\hal4000\icons\\2leftarrow-128.png"))
         self.leftLButton.setIconSize(QtCore.QSize(56, 56))
         self.horizontalLayout_6.addWidget(self.leftLButton)
 
@@ -130,7 +132,7 @@ class stageUI(QtWidgets.QWidget):
         self.leftSButton.setMinimumSize(QtCore.QSize(52, 66))
         self.leftSButton.setMaximumSize(QtCore.QSize(52, 66))
         self.leftSButton.setIcon(
-            QtGui.QIcon("E:\storm-control-python3_pyqt5\storm_control\hal4000\icons\\1leftarrow-128.png"))
+            QtGui.QIcon("D:\storm-control-python3_pyqt5\storm-control-python3_pyqt5\storm_control\hal4000\icons\\1leftarrow-128.png"))
         self.leftSButton.setIconSize(QtCore.QSize(56, 56))
         self.horizontalLayout_6.addWidget(self.leftSButton)
         self.gridLayout.addLayout(self.horizontalLayout_6, 1, 0, 1, 1)
@@ -140,7 +142,7 @@ class stageUI(QtWidgets.QWidget):
         self.rightSButton.setMinimumSize(QtCore.QSize(52, 66))
         self.rightSButton.setMaximumSize(QtCore.QSize(52, 66))
         self.rightSButton.setIcon(
-            QtGui.QIcon("E:\storm-control-python3_pyqt5\storm_control\hal4000\icons\\1rightarrow-128.png"))
+            QtGui.QIcon("D:\storm-control-python3_pyqt5\storm-control-python3_pyqt5\storm_control\hal4000\icons\\1rightarrow-128.png"))
         self.rightSButton.setIconSize(QtCore.QSize(56, 56))
         self.horizontalLayout_11.addWidget(self.rightSButton)
 
@@ -148,7 +150,7 @@ class stageUI(QtWidgets.QWidget):
         self.rightLButton.setMinimumSize(QtCore.QSize(68, 66))
         self.rightLButton.setMaximumSize(QtCore.QSize(68, 66))
         self.rightLButton.setIcon(
-            QtGui.QIcon("E:\storm-control-python3_pyqt5\storm_control\hal4000\icons\\2rightarrow-128.png"))
+            QtGui.QIcon("D:\storm-control-python3_pyqt5\storm-control-python3_pyqt5\storm_control\hal4000\icons\\2rightarrow-128.png"))
         self.rightLButton.setIconSize(QtCore.QSize(56, 56))
         self.horizontalLayout_11.addWidget(self.rightLButton)
         spacerItem4 = QtWidgets.QSpacerItem(10, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
@@ -246,7 +248,7 @@ class stageUI(QtWidgets.QWidget):
         self.downSButton.setMinimumSize(QtCore.QSize(66, 52))
         self.downSButton.setMaximumSize(QtCore.QSize(66, 52))
         self.downSButton.setIcon(
-            QtGui.QIcon("E:\storm-control-python3_pyqt5\storm_control\hal4000\icons\\1downarrow1-128.png"))
+            QtGui.QIcon("D:\storm-control-python3_pyqt5\storm-control-python3_pyqt5\storm_control\hal4000\icons\\1downarrow1-128.png"))
         self.downSButton.setIconSize(QtCore.QSize(56, 56))
         self.downSButton.setObjectName("backwardSButton")
         self.verticalLayout_8.addWidget(self.downSButton)
@@ -255,7 +257,7 @@ class stageUI(QtWidgets.QWidget):
         self.downLButton.setMinimumSize(QtCore.QSize(66, 68))
         self.downLButton.setMaximumSize(QtCore.QSize(66, 68))
         self.downLButton.setIcon(
-            QtGui.QIcon("E:\storm-control-python3_pyqt5\storm_control\hal4000\icons\\2dowarrow-128.png"))
+            QtGui.QIcon("D:\storm-control-python3_pyqt5\storm-control-python3_pyqt5\storm_control\hal4000\icons\\2dowarrow-128.png"))
         self.downLButton.setIconSize(QtCore.QSize(56, 56))
         self.downLButton.setObjectName("backwardLButton")
         self.verticalLayout_8.addWidget(self.downLButton)

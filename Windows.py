@@ -1,4 +1,4 @@
-#import hamamatsu_camera as cam
+import hamamatsu_camera as cam
 import tifffile as tiff
 import numpy as np
 import c_image_manipulation_c as c_image
@@ -6,7 +6,7 @@ import time
 import threading
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import *
-#import PyDAQmx
+import PyDAQmx
 import ctypes
 import sys
 import os
@@ -15,8 +15,8 @@ import windowUI as ui
 import aotf as aotfui
 import stage as Stage
 import message
-#import shutter as shutter
-#import galvo as Galvo
+import shutter as shutter
+import galvo as Galvo
 import synchronization as syn
 import tinytiffwriter
 
@@ -32,11 +32,12 @@ class MainWindow:
         self.lines = None
         self.live_thread_flag = None
         self.record_thread_flag = None
+        self.waiting_thread_flag=None
         self.filename = None
         self.rescale_min = 0
         self.rescale_max = 65535
         self.file=None
-        #self.hcam = cam.HamamatsuCameraMR(camera_id=0)
+        self.hcam = cam.HamamatsuCameraMR(camera_id=0)
 
         self.ui.shutterButton.clicked.connect(lambda: self.shutterUi())
         self.ui.AOTFButton.clicked.connect(lambda: self.aotfUi())
@@ -82,8 +83,16 @@ class MainWindow:
     def loop(self):
 
             [self.frames, dims] = self.hcam.getFrames()
+            if len(self.frames)==0:
+                self.getbuffer_timer.stop()
+                return(0)
             self.ui.message_label.setText("number of frames : " + str(len(self.frames)))
-            if self.live_thread_flag == True and not self.live_thread.is_alive():
+
+            if self.live_thread_flag == True:
+                if  self.live_thread.is_alive():
+                    self.live_thread_flag =False
+                    time.sleep(0.01)
+                    self.live_thread_flag = True
                 self.live_thread = threading.Thread(target=self.display, name='liveThread')
                 self.live_thread.start()
 
@@ -95,8 +104,12 @@ class MainWindow:
         self.hcam.setPropertyValue('exposure_time', float(self.ui.exp_t_doublespinbox.text()) / 1000)
 
     def autoscale(self):
-        self.rescale_min = self.image_min
-        self.rescale_max = self.image_max
+        try:
+            self.rescale_min = self.image_min
+            self.rescale_max = self.image_max
+        except:
+            print("not start display yet")
+
 
     def start_camera(self):
         '''main thread
@@ -105,12 +118,15 @@ class MainWindow:
             self.ui.set_parameter.setText("stop camera")
             self.getbuffer_timer = QtCore.QTimer()
             self.getbuffer_timer.timeout.connect(lambda: self.loop())
-            self.lines = syn.Lines(float(self.ui.doublespinbox_405.text()), float(self.ui.frames_doublespinbox.text()),
-                                   float(self.ui.cycles_doublespinbox.text()),
-                                   float(self.ui.exp_t_doublespinbox.text()))
+            self.lines = syn.Lines(message=self.message, time_405=float(self.ui.doublespinbox_405.text()), frames=float(self.ui.frames_doublespinbox.text()),
+                                   cycles=float(self.ui.cycles_doublespinbox.text()),
+                                   exposure=float(self.ui.exp_t_doublespinbox.text()))
             self.lines.set_lines()
             self.lines.start()
-            #self.hcam.startAcquisition()
+            self.hcam.startAcquisition()
+            self.waiting_thread_flag=True
+            self.camera_thread=threading.Thread(target=self.waiting_message,name="camera waiting message")
+            self.camera_thread.start()
             self.hcam.setPropertyValue('exposure_time', float(self.ui.exp_t_doublespinbox.text()) / 1000.0)
             expo=float(self.ui.exp_t_doublespinbox.text())
             cycle=float(self.ui.doublespinbox_405.text())+float(self.ui.frames_doublespinbox.text())*(expo+12)
@@ -119,24 +135,47 @@ class MainWindow:
 
         else:
             self.ui.set_parameter.setText("start camera")
-            #self.hcam.stopAcquisition()
+            self.ui.set_parameter.setChecked(False)
+            self.hcam.stopAcquisition()
             self.lines.stop()
             self.getbuffer_timer.stop()
+
+    def waiting_message(self):
+        i=0
+        while(self.waiting_thread_flag==True):
+            print("camera is waiting for message %d"%i)
+            i+=1
+            if self.message.find_message("camera")=="stop camera":
+                print("camera gets message, camera is going to stop")
+                self.message.send_message("camera","start camera")
+                self.ui.set_parameter.setText("start camera")
+                self.ui.set_parameter.setChecked(False)
+                self.hcam.stopAcquisition()
+                self.getbuffer_timer.stop()
+                self.waiting_thread_flag=False
+            else:
+                time.sleep(.5)
 
     def display(self):
         '''live child thread
         display images when one cycle ends'''
-        num = min(len(self.frames), int(float(self.ui.frames_doublespinbox.text())))
-        display_time = 18
+        #num = min(len(self.frames), int(float(self.ui.frames_doublespinbox.text())))
+        num=len(self.frames)
+        display_time = 19
         step = 1 if float(self.ui.exp_t_doublespinbox.text())  > display_time else 2
-        sleep_time = step * (float(self.ui.exp_t_doublespinbox.text()) ) - display_time-0.1
+        if self.ui.recordButton.isChecked():
+            sleep_time = step * (float(self.ui.recor_exp_t_doublespinbox.text())) - display_time - 7.5
+        else:
+            sleep_time = step * (float(self.ui.exp_t_doublespinbox.text())) - display_time - 7.5
+        self.ui.message_label.setText(self.ui.message_label.text()+"   sleep time= "+ str(sleep_time))
         #step = 1 if float(self.exp_t_doublespinbox.text()) +11> display_time else 2
         #sleep_time = step * (float(self.exp_t_doublespinbox.text())+11) - display_time - 0.5
+        #m=self.ui.message_label.text()
         for i in range(0, num, step):
             #start = time.clock()
+            #self.ui.message_label.setText("   current frame: " + str(i))
             if self.live_thread_flag == False:
                 return (0)
-            # self.live_event.wait()
             image = self.frames[i].np_array.reshape((2048, 2048))
             [temp, self.image_min, self.image_max] = c_image.rescaleImage(image,
                                                                           False,
@@ -149,8 +188,8 @@ class MainWindow:
             self.ui.livewindow.setPixmap(pixmap01)
             time.sleep(sleep_time / 1000.0)
 
-            #stop=time.clock()
-            #self.message_label.setText(str(stop-start))
+            #stop = time.clock()
+            #print(str(stop-start))
     # when live button is clicked, set live flag to True or False, then live thread will start or stop
     def live_state_change(self):
         if self.ui.liveButton.isChecked():
@@ -171,7 +210,7 @@ class MainWindow:
             self.tiff.tinytiffclose(self.file)
             self.getbuffer_timer.stop()
             self.lines.stop()
-            self.lines = syn.Lines(float(self.ui.doublespinbox_405.text()), float(self.ui.frames_doublespinbox.text()),
+            self.lines = syn.Lines(self.message,float(self.ui.doublespinbox_405.text()), float(self.ui.frames_doublespinbox.text()),
                                    float(self.ui.cycles_doublespinbox.text()),
                                    float(self.ui.exp_t_doublespinbox.text()))
             self.lines.set_lines()
@@ -197,7 +236,7 @@ class MainWindow:
             self.hcam.setPropertyValue('exposure_time', float(self.ui.recor_exp_t_doublespinbox.text()) / 1000)
             self.lines.stop()
             self.getbuffer_timer.stop()
-            self.lines = syn.Lines(float(self.ui.doublespinbox_405.text()), float(self.ui.frames_doublespinbox.text()),
+            self.lines = syn.Lines(self.message,float(self.ui.doublespinbox_405.text()), float(self.ui.frames_doublespinbox.text()),
                                    float(self.ui.cycles_doublespinbox.text()),
                                    float(self.ui.recor_exp_t_doublespinbox.text()))
             self.lines.set_lines()
