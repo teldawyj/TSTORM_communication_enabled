@@ -1,4 +1,4 @@
-from PyDAQmx import Task
+from PyDAQmx import *
 import module
 from PyQt5 import QtWidgets
 import shutterUI as ui
@@ -17,7 +17,7 @@ class Shutter(module.Module):
         task.CreateDOChan("/Dev1/port1/line0", "", DAQmx_Val_ChanForAllLines)
         task.StartTask()
         if self.gui.button_state.isChecked():
-            self.gui.button_atate.setText('ON')
+            self.gui.button_state.setText('ON')
             task.WriteDigitalScalarU32(1, 10.0, 1, None)
             task.StopTask()
         else:

@@ -20,8 +20,8 @@ class Lines(module.Module):
         self.frames=int(frames)
         self.cycles=int(cycles)
         self.exposure=int(exposure)
-        self.done=np.int(0)
-        self.task = Task()
+        self.done=bool32(0)
+
 
     def lists(self):
         self.list_405=[1]*self.time_405
@@ -37,6 +37,7 @@ class Lines(module.Module):
 
 
     def set_lines(self):
+        self.task = Task()
         self.lists()
         self.task.CreateDOChan("/Dev1/port0/line1", "405", DAQmx_Val_ChanForAllLines)
         self.task.CreateDOChan("/Dev1/port0/line2", "647", DAQmx_Val_ChanForAllLines)
@@ -55,6 +56,7 @@ class Lines(module.Module):
             self.list_647*=self.cycles
             self.camera_list*=self.cycles
             self.send_thread_flag=True
+            print("communication mode")
 
 
 
@@ -69,31 +71,49 @@ class Lines(module.Module):
         self.send_thread.start()
 
     def process_message(self):
+        i=0
         while(self.process_thread_flag==True):
+            print(threading.get_ident(),"lines is waiting for message %d"%i)
+            i+=1
             if self.message.find_message("lines")=="start lines":
+                print(threading.get_ident(),"lines get message")
+                try:
+                    self.task.StopTask()
+                except:
+                    pass
+                self.set_lines()
                 self.start()
                 self.process_thread_flag=False
             elif self.message.find_message("lines")=="finished":
                 self.process_thread_flag=False
+                self.message.send_message("camera","stop camera")
                 self.send_thread_flag=True
             else:
-                time.sleep(0.01)
+                time.sleep(0.1)
 
     def send_message(self):
+        i = 0
         while(self.send_thread_flag==True):
-            self.task.IsTaskDone(ctypes.byref(self.done))#FIXME: check this function
-            if self.done:
-                self.message.send_message("stage", "start stage")
+            #if i==0:
+            print(threading.get_ident(),"lines is waiting to send message %d"%i)
+            i+=1
+            self.task.IsTaskDone(ctypes.byref(self.done))
+            if self.done.value:
+                print(threading.get_ident(),"lines is sending message")
                 self.message.send_message("lines", "stop lines")
                 self.send_thread_flag=False
                 self.process_thread_flag = True
                 processing_thread=threading.Thread(target=self.process_message,name="processing thread")
                 processing_thread.start()
+                self.task.ClearTask()
+                self.message.send_message("stage", "start stage")
             else:
-                time.sleep(0.01)
+                time.sleep(0.1)
+
 
     def stop(self):
         self.task.StopTask()
+        self.task.ClearTask()
         pass
 
 

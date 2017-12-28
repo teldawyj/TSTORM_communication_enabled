@@ -1,10 +1,10 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 import stage_UI as ui
-#import pyapt
+import pyapt
 import module
 import threading
 import time
-#import mymclController as mcl
+import mymclController as mcl
 import sys
 
 class Stage(module.Module):
@@ -13,15 +13,16 @@ class Stage(module.Module):
         self.message=message
         self.ui=ui.stageUI()
         self.ui.setupUI()
+        self.ui.show()
         self.processing_flag = None
         self.move_distance=None
-        '''self.handle_x = pyapt.APTMotor(83833850)
+        self.handle_x = pyapt.APTMotor(83833850)
         self.handle_y = pyapt.APTMotor(83840820)
         self.handle_z = pyapt.APTMotor(83841441)
         self.handle_x.setStageAxisInformation(-4, 15)
         self.handle_y.setStageAxisInformation(-10, 10)
         self.handle_z.setStageAxisInformation(-15, 2.4)
-        self.mcl_handle = mcl.MCLStage(mcl_lib="c:/Program Files/Mad City Labs/NanoDrive/Madlib")
+        self.mcl_handle = mcl.MCLStage(mcl_lib="C:\Program Files\Mad City Labs\\NanoDrive\Madlib.dll")
 
         self.ui.xrangeLabel.setText('x range: '+'min: ' +str(self.handle_x.getStageAxisInformation()[0]) +
                                   ',   max: ' + str(self.handle_x.getStageAxisInformation()[1]))
@@ -31,7 +32,7 @@ class Stage(module.Module):
                                 ',   max: ' + str(format(self.handle_z.getStageAxisInformation()[1], '.3f')))
         self.ui.Vlimit.setText('max_acc:' + str(self.handle_y.getVelocityParameterLimits()[0]) + ' max_V:' + str(
             format(self.handle_y.getVelocityParameterLimits()[1], '.2f')))
-        self.ui.rangelabel.setText('z range: ' + str(self.mcl_handle._getCalibration(3)))'''
+        self.ui.rangelabel.setText('z range: ' + str(self.mcl_handle._getCalibration(3)))
 
         self.ui.VON_OFF.clicked.connect(lambda: self.VON_OFFstate())
         self.ui.zupButton.clicked.connect(lambda: self.ZUP())
@@ -49,10 +50,10 @@ class Stage(module.Module):
         self.ui.exitButton.clicked.connect(lambda: self.Exit())
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(lambda: self.readinfo())
-        #self.timer.start(20)
+        self.timer.start(2000)
         self.piezo_timer = QtCore.QTimer()
         self.piezo_timer.timeout.connect(lambda: self.piezoinfo())
-        #self.piezo_timer.start(20)
+        self.piezo_timer.start(20)
         self.ui.goButton.clicked.connect(lambda: self.GO())
         self.ui.piezo_go.clicked.connect(lambda: self.piezo_Abs())
         self.ui.zRel_button.clicked.connect(lambda: self.piezo_Rel(distance=float(self.ui.zReldoublespinbox.text())))
@@ -60,24 +61,35 @@ class Stage(module.Module):
 
 
     def change_button(self):
-        self.processing_flag = True
-        self.move_distance=0.0
-        self.ui.move_stage_in_record.setText("running")
-        processing_thread = threading.Thread(target=self.process_message, name="process message")
-        processing_thread.start()
+        if self.ui.move_stage_in_record.isChecked():
+            self.processing_flag = True
+            self.move_distance = 0.0
+            self.ui.move_stage_in_record.setText("running")
+            self.processing_thread = threading.Thread(target=self.process_message, name="process message")
+            self.processing_thread.start()
+        else:
+            self.processing_flag = False
+            self.ui.move_stage_in_record.setText("set")
+
 
     def process_message(self):
+        i=0
         while(self.ui.move_stage_in_record.isChecked() and self.processing_flag==True):
+            print(threading.get_ident(),"stage is waiting for message %d"%i)
+            i+=1
             if self.message.find_message("stage")=="start stage":
+                print(threading.get_ident(),"stage get message")
                 self.processing_flag=False
                 self.sending_thread = threading.Thread(target=self.send_message, name="send message")
                 self.sending_thread.start()
             else:
-                time.sleep(0.01)
+                time.sleep(0.1)
 
     def send_message(self):
+        print(threading.get_ident(),"stage is sending message")
         if self.move_distance<float(self.ui.record_move_range.text()):
             self.piezo_Rel(distance=1.00)
+            time.sleep(0.1)
             self.move_distance+=1
         else:
             self.message.send_message("stage", "finished")
@@ -85,12 +97,11 @@ class Stage(module.Module):
             self.ui.move_stage_in_record.setChecked(False)
             self.ui.move_stage_in_record.setText("Set")
             return(0)
-        time.sleep(0.01)
         self.message.send_message("stage", "stop stage")
-        self.message.send_message("lines", "start lines")
+        self.processing_thread=threading.Thread(target=self.process_message,name="process message")
         self.processing_flag=True
-        processing_thread=threading.Thread(target=self.process_message,name="process message")
-        processing_thread.start()
+        self.processing_thread.start()
+        self.message.send_message("lines", "start lines")
 
 
 
@@ -140,9 +151,9 @@ class Stage(module.Module):
         self.handle_z.mAbs(0)
 
     def readinfo(self):
-        self.ui.xposLabel.setText(self.ui.xposLabel.text()+str(format(self.handle_x.getPos(), '.3f')))
-        self.ui.yposLabel.setText(self.ui.yposLabel.text() + str(format(self.handle_y.getPos(), '.3f')))
-        self.ui.zposLabel.setText(self.ui.zposLabel.text() + str(format(self.handle_z.getPos(), '.3f')))
+        self.ui.xposLabel.setText("x position: " +str(format(self.handle_x.getPos(), '.3f')))
+        self.ui.yposLabel.setText("y position: " + str(format(self.handle_y.getPos(), '.3f')))
+        self.ui.zposLabel.setText("z position: " + str(format(self.handle_z.getPos(), '.3f')))
 
     def VON_OFFstate(self):
         if self.ui.VON_OFF.isChecked():

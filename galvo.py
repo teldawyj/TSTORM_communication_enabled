@@ -2,7 +2,8 @@ import numpy as np
 import module
 import galvoUI as ui
 from PyQt5.QtWidgets import *
-#import PyDAQmx
+from PyQt5 import QtCore
+import PyDAQmx
 import ctypes
 import time
 import sys
@@ -15,26 +16,28 @@ class Galvo(module.Module):
         self.ui.setupUI()
         self.ui.refresh.clicked.connect(lambda: self.refresh())
         self.ui.button.clicked.connect(lambda: self.galvo())
+        timer=QtCore
 
     def galvo(self):
-        '''if self.ui.button.isChecked():
+        if self.ui.button.isChecked():
             self.ui.button.setText('stop')
             num = float(self.ui.textbox_V.text())
             frequency = float(self.ui.textbox_F.text())
             #self.task = AOTask("/Dev1/ao0", frequency * 2000, frequency * 2000)
             self.task=PyDAQmx.Task()
-            self.task.CreateAOVoltageChan("/Dev1/ao0", "", minVal=0, maxVal=2, PyDAQmx.PyDAQmx.DAQmx_Val_Volts, None)
+            self.task.CreateAOVoltageChan("/Dev1/ao0", "", -2.0, 2.0,
+                                     PyDAQmx.DAQmx_Val_Volts, None)
             self.task.CfgSampClkTiming("", 200000, PyDAQmx.DAQmx_Val_Rising, PyDAQmx.DAQmx_Val_ContSamps, 200000)
 
             list = np.abs(np.arange(-2 * num, 2 * num, 0.002 * num), dtype=np.float64) - num
-            list = np.tile(list, 2 * frequency)
+            list = np.tile(list, 2 * int(frequency))
             list = np.float64(list)
 
             self.task.WriteAnalogF64(200000, 0, -1, PyDAQmx.DAQmx_Val_GroupByChannel, list, None, None)
             self.task.StartTask()
         else:
-            self.button.setText('run')
-            self.task.StopTask()'''
+            self.ui.button.setText('run')
+            self.task.StopTask()
         pass
 
     def refresh(self):
