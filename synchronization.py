@@ -67,48 +67,62 @@ class Lines(module.Module):
 
     def start(self):
         self.task.StartTask()
-        self.send_thread = threading.Thread(target=self.send_message, name="send_thread")
-        self.send_thread.start()
+        self.writing_thread = threading.Thread(target=self.lines_writing, name="writing_thread")
+        self.writing_thread.start()
 
-    def process_message(self):
+    def awaiting_message(self):
         i=0
-        while(self.process_thread_flag==True):
+        while(self.await_thread_flag==True):
             print(threading.get_ident(),"lines is waiting for message %d"%i)
             i+=1
-            if self.message.find_message("lines")=="start lines":
-                print(threading.get_ident(),"lines get message")
-                try:
-                    self.task.StopTask()
-                except:
-                    pass
-                self.set_lines()
-                self.start()
-                self.process_thread_flag=False
-            elif self.message.find_message("lines")=="finished":
-                self.process_thread_flag=False
-                self.message.send_message("camera","stop camera")
-                self.send_thread_flag=True
+            self.process_message()
+
+
+    def process_message(self):
+        if self.message.find_message("camera")=="stop camera":
+            self.await_thread_flag = False
+            self.send_thread_flag = True
+            self.message.send_message("camera state","stopped")
+        elif self.message.find_message("lines") == "start lines":
+            print(threading.get_ident(), "lines get starting message")
+            self.set_lines()
+            self.send_thread_flag=True
+            self.start()
+            self.await_thread_flag = False
+        else:
+            time.sleep(0.1)
+
+    def lines_writing(self):
+        i = 0
+        while (self.send_thread_flag == True):
+            # if i==0:
+            print(threading.get_ident(), "lines is writing %d" % i)
+            i += 1
+            self.task.IsTaskDone(ctypes.byref(self.done))
+            if self.done.value:
+                self.send_thread_flag = False
+                self.stop()
+                print("lines stopped writing")
+                if self.message.find_message("camera")=="stop camera":
+                    self.message.send_message("lines", "lines stopped")
+                    self.message.send_message("camera state","stopped")
+
+                else:
+
+                    sending_thread = threading.Thread(target=self.sending_message, name="sending thread")
+                    sending_thread.start()
+
             else:
                 time.sleep(0.1)
 
     def send_message(self):
-        i = 0
-        while(self.send_thread_flag==True):
-            #if i==0:
-            print(threading.get_ident(),"lines is waiting to send message %d"%i)
-            i+=1
-            self.task.IsTaskDone(ctypes.byref(self.done))
-            if self.done.value:
-                print(threading.get_ident(),"lines is sending message")
-                self.message.send_message("lines", "stop lines")
-                self.send_thread_flag=False
-                self.process_thread_flag = True
-                processing_thread=threading.Thread(target=self.process_message,name="processing thread")
-                processing_thread.start()
-                self.task.ClearTask()
-                self.message.send_message("stage", "start stage")
-            else:
-                time.sleep(0.1)
+
+        self.message.send_message("lines", "lines stopped")
+        self.await_thread_flag = True
+        await_thread=threading.Thread(target=self.process_message,name="processing thread")
+        await_thread.start()
+        self.message.send_message("stage", "start stage")
+
 
 
     def stop(self):

@@ -50,7 +50,7 @@ class Stage(module.Module):
         self.ui.exitButton.clicked.connect(lambda: self.Exit())
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(lambda: self.readinfo())
-        self.timer.start(2000)
+        self.timer.start(20)
         self.piezo_timer = QtCore.QTimer()
         self.piezo_timer.timeout.connect(lambda: self.piezoinfo())
         self.piezo_timer.start(20)
@@ -62,26 +62,29 @@ class Stage(module.Module):
 
     def change_button(self):
         if self.ui.move_stage_in_record.isChecked():
-            self.processing_flag = True
+            self.message.send_message("stage","stage awaiting")
+            self.awaiting_flag = True
             self.move_distance = 0.0
             self.ui.move_stage_in_record.setText("running")
-            self.processing_thread = threading.Thread(target=self.process_message, name="process message")
-            self.processing_thread.start()
+            self.awaiting_thread = threading.Thread(target=self.awaiting_message, name="await message")
+            self.awaiting_thread.start()
         else:
-            self.processing_flag = False
+            self.awaiting_flag = False
             self.ui.move_stage_in_record.setText("set")
 
 
-    def process_message(self):
+    def awaiting_message(self):
         i=0
-        while(self.ui.move_stage_in_record.isChecked() and self.processing_flag==True):
+        while(self.ui.move_stage_in_record.isChecked() and self.awaiting_flag==True):
             print(threading.get_ident(),"stage is waiting for message %d"%i)
             i+=1
-            if self.message.find_message("stage")=="start stage":
-                print(threading.get_ident(),"stage get message")
-                self.processing_flag=False
-                self.sending_thread = threading.Thread(target=self.send_message, name="send message")
-                self.sending_thread.start()
+            if self.message.find_message("camera")=="stop camera":
+                self.awaiting_flag=False
+                self.message.send_message("stage","stage stopped")
+
+            elif self.message.find_message("stage")=="start stage":
+                print(threading.get_ident(),"stage get starting message")
+                self.send_message()
             else:
                 time.sleep(0.1)
 
@@ -92,15 +95,13 @@ class Stage(module.Module):
             time.sleep(0.1)
             self.move_distance+=1
         else:
-            self.message.send_message("stage", "finished")
-            self.message.send_message("lines", "finished")
+            self.message.send_message("camera", "stop camera")
             self.ui.move_stage_in_record.setChecked(False)
             self.ui.move_stage_in_record.setText("Set")
             return(0)
-        self.message.send_message("stage", "stop stage")
-        self.processing_thread=threading.Thread(target=self.process_message,name="process message")
-        self.processing_flag=True
-        self.processing_thread.start()
+        self.message.send_message("stage", "stage stopped")
+        self.awaiting_thread=threading.Thread(target=self.awaiting_message,name="await message")
+        self.awaiting_thread.start()
         self.message.send_message("lines", "start lines")
 
 

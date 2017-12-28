@@ -53,45 +53,18 @@ class MainWindow:
         self.record_thread = threading.Thread(target=self.record, name="recordThread")
 
 
-
-    '''def loop(self):
-        ''''''thread 1, restart live thread and/or record thread when flags are Ture and cycle ends''''''
-        # self.hcam.startAcquisition()
-        #i=0
-        while (self.loop_flag == True):
-
-            #print("loop thread %d     live thread  %d     record thread  %d" %(i,self.live.is_alive(),self.record_thread.is_alive()))
-            #i+=1
-            if True: #signal  # if self.count==int(self.frames_doublespinbox.text()):
-                #[self.frames, dims] = self.hcam.getFrames()
-                if self.live_thread_flag == True and not self.live.is_alive():
-                    self.live = threading.Thread(target=self.display, name='liveThread')
-                    self.live.start()
-                if self.record_thread_flag == True and not self.record_thread.is_alive():
-                    self.record_thread = threading.Thread(target=self.record, name="recordThread")
-                    self.record_thread.start()
-            time.sleep(0.005)'''
-
-    '''def signal(self):
-        while(self.signal_thread_flag==True):
-            self.lines.DItask.ReadDigitalU32(1, 10.0, PyDAQmx.DAQmx_Val_GroupByChannel, self.lines.data, 1, ctypes.byref(self.lines.read), None)
-            if self.lines.data[0]==1:
-                self.loop_thread = threading.Thread(target=self.loop, name="loopThread")
-                self.loop_thread.start()'''
-
-
     def loop(self):
 
             [self.frames, dims] = self.hcam.getFrames()
-            if len(self.frames)==0:
-                self.getbuffer_timer.stop()
-                return(0)
+            #if len(self.frames)==0:
+            #    self.getbuffer_timer.stop()
+            #    return(0)
             self.ui.message_label.setText("number of frames : " + str(len(self.frames)))
 
             if self.live_thread_flag == True:
                 if  self.live_thread.is_alive():
                     self.live_thread_flag =False
-                    time.sleep(0.01)
+                    time.sleep(0.1)
                     self.live_thread_flag = True
                 self.live_thread = threading.Thread(target=self.display, name='liveThread')
                 self.live_thread.start()
@@ -110,64 +83,93 @@ class MainWindow:
         except:
             print("not start display yet")
 
-
-    def start_camera(self):
-        '''main thread
-        use NI digital output to trigger laser and camera'''
-        if self.ui.set_parameter.isChecked():
-            self.ui.set_parameter.setText("stop camera")
+    def start_running(self):
+        if self.ui.recordButton.isChecked():
             self.getbuffer_timer = QtCore.QTimer()
             self.getbuffer_timer.timeout.connect(lambda: self.loop())
-            self.lines = syn.Lines(message=self.message, time_405=float(self.ui.doublespinbox_405.text()), frames=float(self.ui.frames_doublespinbox.text()),
+            self.lines = syn.Lines(message=self.message, time_405=float(self.ui.doublespinbox_405.text()),
+                                   frames=float(self.ui.frames_doublespinbox.text()),
+                                   cycles=float(self.ui.cycles_doublespinbox.text()),
+                                   exposure=float(self.ui.recor_exp_t_doublespinbox.text()))
+            self.lines.set_lines()
+            self.lines.start()
+            self.ui.set_parameter.setChecked(True)
+            self.ui.set_parameter.setText("stop camera")
+            self.message.send_message("camera state", "started")
+            # self.hcam.startAcquisition()
+            self.hcam.setPropertyValue('exposure_time', float(self.ui.recor_exp_t_doublespinbox.text()) / 1000.0)
+            #self.waiting_thread_flag = True
+            #self.camera_thread = threading.Thread(target=self.waiting_message, name="camera waiting message")
+            #self.camera_thread.start()
+            cycle = float(self.ui.doublespinbox_405.text()) + \
+                    float(self.ui.frames_doublespinbox.text()) * (float(self.ui.recor_exp_t_doublespinbox.text()) + 12)
+            self.getbuffer_timer.start(cycle)
+            self.ui.message_label.setText("current cycle time is : " + str(cycle / 1000.0))
+        else:
+            self.getbuffer_timer = QtCore.QTimer()
+            self.getbuffer_timer.timeout.connect(lambda: self.loop())
+            self.lines = syn.Lines(message=self.message, time_405=float(self.ui.doublespinbox_405.text()),
+                                   frames=float(self.ui.frames_doublespinbox.text()),
                                    cycles=float(self.ui.cycles_doublespinbox.text()),
                                    exposure=float(self.ui.exp_t_doublespinbox.text()))
             self.lines.set_lines()
             self.lines.start()
-            self.hcam.startAcquisition()
-            self.waiting_thread_flag=True
-            self.camera_thread=threading.Thread(target=self.waiting_message,name="camera waiting message")
-            self.camera_thread.start()
+            self.message.send_message("camera state","started")
+            self.ui.set_parameter.setChecked(True)
+            self.ui.set_parameter.setText("stop camera")
+            # self.hcam.startAcquisition()
             self.hcam.setPropertyValue('exposure_time', float(self.ui.exp_t_doublespinbox.text()) / 1000.0)
-            expo=float(self.ui.exp_t_doublespinbox.text())
-            cycle=float(self.ui.doublespinbox_405.text())+float(self.ui.frames_doublespinbox.text())*(expo+12)
+            #if float(self.ui.cycles_doublespinbox.text())!=0:
+            #    self.waiting_thread_flag = True
+            #    self.camera_thread = threading.Thread(target=self.waiting_message, name="camera waiting message")
+            #    self.camera_thread.start()
+
+            cycle = float(self.ui.doublespinbox_405.text()) + \
+                    float(self.ui.frames_doublespinbox.text()) * (float(self.ui.exp_t_doublespinbox.text()) + 12)
             self.getbuffer_timer.start(cycle)
             self.ui.message_label.setText("current cycle time is : " + str(cycle / 1000.0))
 
-        else:
+    def stop_running(self):
+        if float(self.ui.cycles_doublespinbox.text())==0:
+            self.lines.stop()
+            self.message.send_message("camera state","stopped")
+            self.getbuffer_timer.stop()
             self.ui.set_parameter.setText("start camera")
             self.ui.set_parameter.setChecked(False)
-            self.hcam.stopAcquisition()
-            self.lines.stop()
+        else:
+            self.message.send_message("camera", "stop camera")
+            while self.message.find_message("camera state")!="stopped":
+                time.sleep(0.1)
             self.getbuffer_timer.stop()
+            self.ui.set_parameter.setText("start camera")
+            self.ui.set_parameter.setChecked(False)
 
-    def waiting_message(self):
-        i=0
-        while(self.waiting_thread_flag==True):
-            print("camera is waiting for message %d"%i)
-            i+=1
-            if self.message.find_message("camera")=="stop camera":
-                print("camera gets message, camera is going to stop")
-                self.message.send_message("camera","start camera")
-                self.ui.set_parameter.setText("start camera")
-                self.ui.set_parameter.setChecked(False)
-                self.hcam.stopAcquisition()
-                self.getbuffer_timer.stop()
-                self.waiting_thread_flag=False
-            else:
-                time.sleep(.5)
+    def set_parameter_button_pushed(self):
+        '''main thread
+        use NI digital output to trigger laser and camera'''
+        if self.ui.set_parameter.isChecked():
+            self.ui.set_parameter.setText("stop camera")
+            self.start_running()
 
-    def display(self):
+        else:
+            self.stop_running()
+            self.ui.set_parameter.setText("start camera")
+
+
+    def living(self):
         '''live child thread
         display images when one cycle ends'''
         #num = min(len(self.frames), int(float(self.ui.frames_doublespinbox.text())))
+
         num=len(self.frames)
-        display_time = 19
-        step = 1 if float(self.ui.exp_t_doublespinbox.text())  > display_time else 2
-        if self.ui.recordButton.isChecked():
-            sleep_time = step * (float(self.ui.recor_exp_t_doublespinbox.text())) - display_time - 7.5
-        else:
-            sleep_time = step * (float(self.ui.exp_t_doublespinbox.text())) - display_time - 7.5
-        self.ui.message_label.setText(self.ui.message_label.text()+"   sleep time= "+ str(sleep_time))
+        #display_time = 19
+        step = 2 if self.ui.recordButton.isChecked() else 1
+        #if self.ui.recordButton.isChecked():
+        #    sleep_time = step * (float(self.ui.recor_exp_t_doublespinbox.text())) - display_time - 7.5
+        #else:
+        #    sleep_time = step * (float(self.ui.exp_t_doublespinbox.text())) - display_time - 7.5
+        sleep_time=10
+        #self.ui.message_label.setText(self.ui.message_label.text()+"   sleep time= "+ str(sleep_time))
         #step = 1 if float(self.exp_t_doublespinbox.text()) +11> display_time else 2
         #sleep_time = step * (float(self.exp_t_doublespinbox.text())+11) - display_time - 0.5
         #m=self.ui.message_label.text()
@@ -193,62 +195,39 @@ class MainWindow:
     # when live button is clicked, set live flag to True or False, then live thread will start or stop
     def live_state_change(self):
         if self.ui.liveButton.isChecked():
-            self.ui.liveButton.setText('stop live')
-            self.live_thread_flag = True
+            self.start_living()
+
 
         else:
-            self.ui.liveButton.setText('Live')
-            self.live_thread_flag = False
+            self.stop_living()
+
+    def start_living(self):
+        self.ui.liveButton.setText('stop live')
+        self.message.send_message("live", "start living")
+        self.live_thread_flag = True
+
+    def stop_living(self):
+        self.ui.liveButton.setText('Live')
+        self.message.send_message("live", "stop living")
+        self.live_thread_flag = False
 
     # when record button is clicked, set record flag to True or False, then record thread will start or stop
 
     def record_state_change(self):
         if not self.ui.recordButton.isChecked():
-            self.hcam.setPropertyValue('exposure_time', float(self.ui.exp_t_doublespinbox.text()) / 1000)
-            self.ui.recordButton.setText('record')
-            self.record_thread_flag = False
-            self.tiff.tinytiffclose(self.file)
-            self.getbuffer_timer.stop()
-            self.lines.stop()
-            self.lines = syn.Lines(self.message,float(self.ui.doublespinbox_405.text()), float(self.ui.frames_doublespinbox.text()),
-                                   float(self.ui.cycles_doublespinbox.text()),
-                                   float(self.ui.exp_t_doublespinbox.text()))
-            self.lines.set_lines()
-            self.lines.start()
-            expo = float(self.ui.exp_t_doublespinbox.text())
-            cycle = float(self.ui.doublespinbox_405.text()) + float(self.ui.frames_doublespinbox.text()) * (expo + 12)
-            self.getbuffer_timer.start(cycle)
+            self.message.send_message("record","stop recording")
+            self.stop_record()
+            self.stop_running()
+            self.start_running()
+
 
         else:
-            self.filename = 'D:\\Data\\' + self.ui.name_text.text() + self.ui.name_num.text() + '.tif'
-            if os.path.exists(self.filename):
-                message, ok = QInputDialog.getText(self.ui, "file exists", "continue will cover the old file",
-                                                   QLineEdit.Normal,
-                                                   "Yes, please cover the old file")
-                if not ok:
-                    self.ui.recordButton.setText('record')
-                    self.ui.recordButton.setChecked(False)
-                    self.record_thread_flag = False
-                    return 0
-                    # self.tif = tiff.TiffWriter(filename,
-                    #                          imagej=True)
-            self.ui.recordButton.setText('stop')
-            self.hcam.setPropertyValue('exposure_time', float(self.ui.recor_exp_t_doublespinbox.text()) / 1000)
-            self.lines.stop()
-            self.getbuffer_timer.stop()
-            self.lines = syn.Lines(self.message,float(self.ui.doublespinbox_405.text()), float(self.ui.frames_doublespinbox.text()),
-                                   float(self.ui.cycles_doublespinbox.text()),
-                                   float(self.ui.recor_exp_t_doublespinbox.text()))
-            self.lines.set_lines()
-            self.lines.start()
-            expo = float(self.ui.recor_exp_t_doublespinbox.text())
-            cycle = float(self.ui.doublespinbox_405.text()) + float(self.ui.frames_doublespinbox.text()) * (expo + 12)
-            self.getbuffer_timer.start(cycle)
-            self.record_thread_flag = True
-            self.tiff=tinytiffwriter.tinytiffwriter()
-            self.file=self.tiff.tinytiffopen(self.filename)
+            self.message.send_message("record","start recording")
+            self.start_record()
+            self.stop_running()
+            self.start_running()
 
-    def record(self):
+    def recording(self):
         '''record child thread
         record frames when one cycle ends'''
         # start = time.clock()
@@ -258,6 +237,32 @@ class MainWindow:
             image = i.np_array.reshape((2048, 2048))
             self.tiff.tinytiffwrite(image,self.file)
 
+    def start_record(self):
+        self.filename = 'D:\\Data\\' + self.ui.name_text.text() + self.ui.name_num.text() + '.tif'
+        if os.path.exists(self.filename):
+            message, ok = QInputDialog.getText(self.ui, "file exists", "continue will cover the old file",
+                                               QLineEdit.Normal,
+                                               "Yes, please cover the old file")
+            if not ok:
+                self.stop_record()
+                self.message.send_message("record","stop recording")
+                return 0
+                # self.tif = tiff.TiffWriter(filename,
+                #                          imagej=True)
+        self.ui.recordButton.setText('stop')
+        self.tiff = tinytiffwriter.tinytiffwriter()
+        self.file = self.tiff.tinytiffopen(self.filename)
+        self.record_thread_flag = True
+
+
+
+    def stop_record(self):
+        self.record_thread_flag = False
+        self.ui.recordButton.setChecked(False)
+        try:
+            self.tiff.tinytiffclose(self.file)
+        except:
+            pass
 
     def stageUi(self):
         self.ui.message_label.setText('initializing stage Gui')
