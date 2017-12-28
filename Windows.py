@@ -259,6 +259,7 @@ class MainWindow:
     def stop_record(self):
         self.record_thread_flag = False
         self.ui.recordButton.setChecked(False)
+        self.ui.recordButton.setText("record")
         try:
             self.tiff.tinytiffclose(self.file)
         except:
