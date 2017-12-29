@@ -5,7 +5,7 @@ class Message(object):
 
     def send_message(self,key,value):
         self.message[key]=value
-        print(key+'  '+self.message[key])
+        print(key,"   ", self.message[key])
 
     def find_message(self,key):
         if key in self.message.keys():
