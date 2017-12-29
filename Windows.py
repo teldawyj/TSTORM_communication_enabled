@@ -43,22 +43,25 @@ class MainWindow:
         self.ui.AOTFButton.clicked.connect(lambda: self.aotfUi())
         self.ui.GalvoButton.clicked.connect(lambda: self.galvoUi())
         self.ui.StageButton.clicked.connect(lambda: self.stageUi())
-        self.ui.set_parameter.clicked.connect(lambda: self.start_camera())
+        self.ui.set_parameter.clicked.connect(lambda: self.set_parameter_button_pushed())
         self.ui.exposurebutton.clicked.connect(lambda: self.set_exposure())
         self.ui.liveButton.clicked.connect(lambda: self.live_state_change())
         self.ui.recordButton.clicked.connect(lambda: self.record_state_change())
         self.ui.autoscalebutton.clicked.connect(lambda: self.autoscale())
 
-        self.live_thread = threading.Thread(target=self.display, name='liveThread')
-        self.record_thread = threading.Thread(target=self.record, name="recordThread")
+        self.live_thread = threading.Thread(target=self.living, name='liveThread')
+        self.record_thread = threading.Thread(target=self.recording, name="recordThread")
 
 
     def loop(self):
 
             [self.frames, dims] = self.hcam.getFrames()
-            #if len(self.frames)==0:
-            #    self.getbuffer_timer.stop()
-            #    return(0)
+            if len(self.frames)==0:
+                #self.hcam.stopAcquisition()
+                self.getbuffer_timer.stop()
+                self.ui.set_parameter.setText("start camera")
+                self.ui.set_parameter.setChecked(False)
+                return(0)
             self.ui.message_label.setText("number of frames : " + str(len(self.frames)))
 
             if self.live_thread_flag == True:
@@ -66,11 +69,11 @@ class MainWindow:
                     self.live_thread_flag =False
                     time.sleep(0.1)
                     self.live_thread_flag = True
-                self.live_thread = threading.Thread(target=self.display, name='liveThread')
+                self.live_thread = threading.Thread(target=self.living, name='liveThread')
                 self.live_thread.start()
 
             if self.record_thread_flag == True and not self.record_thread.is_alive():
-                self.record_thread = threading.Thread(target=self.record, name="recordThread")
+                self.record_thread = threading.Thread(target=self.recording, name="recordThread")
                 self.record_thread.start()
 
     def set_exposure(self):
@@ -85,6 +88,8 @@ class MainWindow:
 
     def start_running(self):
         if self.ui.recordButton.isChecked():
+            self.message.send_message("camera", "start camera")
+            self.message.send_message("mode","recording mode")
             self.getbuffer_timer = QtCore.QTimer()
             self.getbuffer_timer.timeout.connect(lambda: self.loop())
             self.lines = syn.Lines(message=self.message, time_405=float(self.ui.doublespinbox_405.text()),
@@ -96,7 +101,7 @@ class MainWindow:
             self.ui.set_parameter.setChecked(True)
             self.ui.set_parameter.setText("stop camera")
             self.message.send_message("camera state", "started")
-            # self.hcam.startAcquisition()
+            self.hcam.startAcquisition()
             self.hcam.setPropertyValue('exposure_time', float(self.ui.recor_exp_t_doublespinbox.text()) / 1000.0)
             #self.waiting_thread_flag = True
             #self.camera_thread = threading.Thread(target=self.waiting_message, name="camera waiting message")
@@ -106,6 +111,8 @@ class MainWindow:
             self.getbuffer_timer.start(cycle)
             self.ui.message_label.setText("current cycle time is : " + str(cycle / 1000.0))
         else:
+            self.message.send_message("mode", "living mode")
+            self.message.send_message("camera", "start camera")
             self.getbuffer_timer = QtCore.QTimer()
             self.getbuffer_timer.timeout.connect(lambda: self.loop())
             self.lines = syn.Lines(message=self.message, time_405=float(self.ui.doublespinbox_405.text()),
@@ -117,7 +124,7 @@ class MainWindow:
             self.message.send_message("camera state","started")
             self.ui.set_parameter.setChecked(True)
             self.ui.set_parameter.setText("stop camera")
-            # self.hcam.startAcquisition()
+            self.hcam.startAcquisition()
             self.hcam.setPropertyValue('exposure_time', float(self.ui.exp_t_doublespinbox.text()) / 1000.0)
             #if float(self.ui.cycles_doublespinbox.text())!=0:
             #    self.waiting_thread_flag = True
@@ -132,15 +139,22 @@ class MainWindow:
     def stop_running(self):
         if float(self.ui.cycles_doublespinbox.text())==0:
             self.lines.stop()
+            self.hcam.stopAcquisition()
             self.message.send_message("camera state","stopped")
+            self.message.send_message("camera","waiting")
             self.getbuffer_timer.stop()
             self.ui.set_parameter.setText("start camera")
             self.ui.set_parameter.setChecked(False)
         else:
-            self.message.send_message("camera", "stop camera")
+            if self.ui.recordButton.isChecked():
+                self.message.send_message("camera", "stop camera do not stop stage")
+            else:
+                self.message.send_message("camera", "stop camera")
             while self.message.find_message("camera state")!="stopped":
                 time.sleep(0.1)
             self.getbuffer_timer.stop()
+            self.hcam.stopAcquisition()
+            self.message.send_message("camera", "waiting")
             self.ui.set_parameter.setText("start camera")
             self.ui.set_parameter.setChecked(False)
 
@@ -148,12 +162,12 @@ class MainWindow:
         '''main thread
         use NI digital output to trigger laser and camera'''
         if self.ui.set_parameter.isChecked():
-            self.ui.set_parameter.setText("stop camera")
             self.start_running()
 
         else:
+
             self.stop_running()
-            self.ui.set_parameter.setText("start camera")
+
 
 
     def living(self):
@@ -168,7 +182,7 @@ class MainWindow:
         #    sleep_time = step * (float(self.ui.recor_exp_t_doublespinbox.text())) - display_time - 7.5
         #else:
         #    sleep_time = step * (float(self.ui.exp_t_doublespinbox.text())) - display_time - 7.5
-        sleep_time=10
+        sleep_time=15
         #self.ui.message_label.setText(self.ui.message_label.text()+"   sleep time= "+ str(sleep_time))
         #step = 1 if float(self.exp_t_doublespinbox.text()) +11> display_time else 2
         #sleep_time = step * (float(self.exp_t_doublespinbox.text())+11) - display_time - 0.5
@@ -267,6 +281,8 @@ class MainWindow:
 
     def stageUi(self):
         self.ui.message_label.setText('initializing stage Gui')
+        #stage_=threading.Thread(target=Stage.Stage,args=(self.message,))
+        #stage_.start()
         example = Stage.Stage(self.message)
         self.ui.message_label.setText('stage Gui initialized')
 

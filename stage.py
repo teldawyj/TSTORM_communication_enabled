@@ -19,6 +19,9 @@ class Stage(module.Module):
         self.handle_x = pyapt.APTMotor(83833850)
         self.handle_y = pyapt.APTMotor(83840820)
         self.handle_z = pyapt.APTMotor(83841441)
+        self.timer = QtCore.QTimer()
+        self.timer.timeout.connect(lambda: self.readinfo())
+        self.timer.start(20)
         self.handle_x.setStageAxisInformation(-4, 15)
         self.handle_y.setStageAxisInformation(-10, 10)
         self.handle_z.setStageAxisInformation(-15, 2.4)
@@ -48,9 +51,7 @@ class Stage(module.Module):
         self.ui.rightLButton.clicked.connect(lambda: self.YRIGHTL())
         self.ui.rightSButton.clicked.connect(lambda: self.YRIGHT())
         self.ui.exitButton.clicked.connect(lambda: self.Exit())
-        self.timer = QtCore.QTimer()
-        self.timer.timeout.connect(lambda: self.readinfo())
-        self.timer.start(20)
+
         self.piezo_timer = QtCore.QTimer()
         self.piezo_timer.timeout.connect(lambda: self.piezoinfo())
         self.piezo_timer.start(20)
@@ -75,16 +76,23 @@ class Stage(module.Module):
 
     def awaiting_message(self):
         i=0
+        print(threading.get_ident(), "stage is waiting for message %d" % i)
         while(self.ui.move_stage_in_record.isChecked() and self.awaiting_flag==True):
-            print(threading.get_ident(),"stage is waiting for message %d"%i)
-            i+=1
+            #print(threading.get_ident(),"stage is waiting for message %d"%i)
+            #i+=1
             if self.message.find_message("camera")=="stop camera":
+                print("stage action over")
                 self.awaiting_flag=False
                 self.message.send_message("stage","stage stopped")
-
+            elif self.message.find_message("camera")=="stop camera do not stop stage":
+                print("stage waiting for recording")
+                #self.awaiting_flag = False
+                self.message.send_message("stage", "stage stopped")
             elif self.message.find_message("stage")=="start stage":
+                self.awaiting_flag = False
                 print(threading.get_ident(),"stage get starting message")
-                self.send_message()
+                send_thread=threading.Thread(target=self.send_message())
+                send_thread.start()
             else:
                 time.sleep(0.1)
 
@@ -96,13 +104,17 @@ class Stage(module.Module):
             self.move_distance+=1
         else:
             self.message.send_message("camera", "stop camera")
+            self.message.send_message("stage","stop stage")
             self.ui.move_stage_in_record.setChecked(False)
+            self.awaiting_flag = False
             self.ui.move_stage_in_record.setText("Set")
             return(0)
         self.message.send_message("stage", "stage stopped")
-        self.awaiting_thread=threading.Thread(target=self.awaiting_message,name="await message")
-        self.awaiting_thread.start()
         self.message.send_message("lines", "start lines")
+        time.sleep(0.5)
+        self.awaiting_flag = True
+        awaiting_thread=threading.Thread(target=self.awaiting_message)
+        awaiting_thread.start()
 
 
 
