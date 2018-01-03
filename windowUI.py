@@ -42,7 +42,7 @@ class MainWindow(QWidget):
         self.doublespinbox_405 = QDoubleSpinBox()
         self.doublespinbox_405.setMaximum(1000)
         self.doublespinbox_405.setMinimum(1)
-        self.doublespinbox_405.setValue(200)
+        self.doublespinbox_405.setValue(1)
         horizontalLayout_p1.addWidget(self.doublespinbox_405)
 # set frames number per cycle
         horizontalLayout_p2 = QHBoxLayout()
@@ -51,7 +51,7 @@ class MainWindow(QWidget):
         self.frames_doublespinbox = QDoubleSpinBox()
         self.frames_doublespinbox.setMinimum(1)
         self.frames_doublespinbox.setMaximum(1000)
-        self.frames_doublespinbox.setValue(50)
+        self.frames_doublespinbox.setValue(2)
         horizontalLayout_p2.addWidget(self.frames_doublespinbox)
         # set cycles
         horizontalLayout_p3 = QHBoxLayout()
