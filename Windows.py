@@ -19,6 +19,8 @@ import shutter as shutter
 import galvo as Galvo
 import synchronization as syn
 import tinytiffwriter
+import tifffile
+import libtiff
 
 
 class MainWindow:
@@ -37,14 +39,24 @@ class MainWindow:
         self.rescale_min = 0
         self.rescale_max = 65535
         self.file=None
+        self.lock = threading.Lock()
         self.hcam = cam.HamamatsuCameraMR(camera_id=0)
+        '''try:
+            self.hcam.setPropertyValue("trigger_source",2)
+        except:
+            print("camera set external trigger mode failed")
+        try:
+            self.hcam.setPropertyValue("trigger_polarity",2)
+            #print(self.hcam.getPropertyText("trigger_polarity"))
+        except:
+            print("camera set positive polarity failed")'''
 
         self.ui.shutterButton.clicked.connect(lambda: self.shutterUi())
         self.ui.AOTFButton.clicked.connect(lambda: self.aotfUi())
         self.ui.GalvoButton.clicked.connect(lambda: self.galvoUi())
         self.ui.StageButton.clicked.connect(lambda: self.stageUi())
         self.ui.set_parameter.clicked.connect(lambda: self.set_parameter_button_pushed())
-        self.ui.exposurebutton.clicked.connect(lambda: self.set_exposure())
+#        self.ui.exposurebutton.clicked.connect(lambda: self.set_exposure())
         self.ui.liveButton.clicked.connect(lambda: self.live_state_change())
         self.ui.recordButton.clicked.connect(lambda: self.record_state_change())
         self.ui.autoscalebutton.clicked.connect(lambda: self.autoscale())
@@ -55,20 +67,28 @@ class MainWindow:
 
     def loop(self):
 
-            [self.frames, dims] = self.hcam.getFrames()
-            if len(self.frames)==0:
+            [self.frames, dims] = self.hcam.getFrames()#FIXME: cannot get buffer when external triger
+            #print("frames number=  " ,len(self.frames))
+            '''if len(self.frames)==0:
                 #self.hcam.stopAcquisition()
                 self.getbuffer_timer.stop()
+                if self.ui.recordButton.isChecked():
+                    self.ui.recordButton.setChecked(False)
+                    self.ui.recordButton.setText("record")
+                    self.record_thread_flag=False
                 self.ui.set_parameter.setText("start camera")
                 self.ui.set_parameter.setChecked(False)
-                return(0)
-            self.ui.message_label.setText("number of frames : " + str(len(self.frames)))
+                return(0)'''
+            self.ui.message_label.setText("current cycle time is : " + str(self.cycle / 1000.0))
+            self.ui.message_label.setText("cycle time: " + str(self.cycle / 1000.0)+"frames : " + str(len(self.frames))
+                                          )
 
             if self.live_thread_flag == True:
                 if  self.live_thread.is_alive():
                     self.live_thread_flag =False
-                    time.sleep(0.1)
+                    time.sleep(0.075)
                     self.live_thread_flag = True
+                #print("display start")
                 self.live_thread = threading.Thread(target=self.living, name='liveThread')
                 self.live_thread.start()
 
@@ -76,8 +96,8 @@ class MainWindow:
                 self.record_thread = threading.Thread(target=self.recording, name="recordThread")
                 self.record_thread.start()
 
-    def set_exposure(self):
-        self.hcam.setPropertyValue('exposure_time', float(self.ui.exp_t_doublespinbox.text()) / 1000)
+#    def set_exposure(self):
+#        self.hcam.setPropertyValue('exposure_time', float(self.ui.exp_t_doublespinbox.text()) / 1000)
 
     def autoscale(self):
         try:
@@ -103,9 +123,6 @@ class MainWindow:
             self.message.send_message("camera state", "started")
             self.hcam.startAcquisition()
             self.hcam.setPropertyValue('exposure_time', float(self.ui.recor_exp_t_doublespinbox.text()) / 1000.0)
-            #self.waiting_thread_flag = True
-            #self.camera_thread = threading.Thread(target=self.waiting_message, name="camera waiting message")
-            #self.camera_thread.start()
             cycle = float(self.ui.doublespinbox_405.text()) + \
                     float(self.ui.frames_doublespinbox.text()) * (float(self.ui.recor_exp_t_doublespinbox.text()) + 12)
             self.getbuffer_timer.start(cycle)
@@ -126,15 +143,10 @@ class MainWindow:
             self.ui.set_parameter.setText("stop camera")
             self.hcam.startAcquisition()
             self.hcam.setPropertyValue('exposure_time', float(self.ui.exp_t_doublespinbox.text()) / 1000.0)
-            #if float(self.ui.cycles_doublespinbox.text())!=0:
-            #    self.waiting_thread_flag = True
-            #    self.camera_thread = threading.Thread(target=self.waiting_message, name="camera waiting message")
-            #    self.camera_thread.start()
-
-            cycle = float(self.ui.doublespinbox_405.text()) + \
+            self.cycle = float(self.ui.doublespinbox_405.text()) + \
                     float(self.ui.frames_doublespinbox.text()) * (float(self.ui.exp_t_doublespinbox.text()) + 12)
-            self.getbuffer_timer.start(cycle)
-            self.ui.message_label.setText("current cycle time is : " + str(cycle / 1000.0))
+            self.getbuffer_timer.start(self.cycle)
+
 
     def stop_running(self):
         if float(self.ui.cycles_doublespinbox.text())==0:
@@ -162,10 +174,11 @@ class MainWindow:
         '''main thread
         use NI digital output to trigger laser and camera'''
         if self.ui.set_parameter.isChecked():
+            print("action start")
             self.start_running()
 
         else:
-
+            print("action stop")
             self.stop_running()
 
 
@@ -174,45 +187,41 @@ class MainWindow:
         '''live child thread
         display images when one cycle ends'''
         #num = min(len(self.frames), int(float(self.ui.frames_doublespinbox.text())))
-
         num=len(self.frames)
-        #display_time = 19
-        step = 2 if self.ui.recordButton.isChecked() else 1
-        #if self.ui.recordButton.isChecked():
-        #    sleep_time = step * (float(self.ui.recor_exp_t_doublespinbox.text())) - display_time - 7.5
-        #else:
-        #    sleep_time = step * (float(self.ui.exp_t_doublespinbox.text())) - display_time - 7.5
-        sleep_time=15
-        #self.ui.message_label.setText(self.ui.message_label.text()+"   sleep time= "+ str(sleep_time))
-        #step = 1 if float(self.exp_t_doublespinbox.text()) +11> display_time else 2
-        #sleep_time = step * (float(self.exp_t_doublespinbox.text())+11) - display_time - 0.5
-        #m=self.ui.message_label.text()
+        step = 2
+        sleep_time=70
         for i in range(0, num, step):
-            #start = time.clock()
-            #self.ui.message_label.setText("   current frame: " + str(i))
             if self.live_thread_flag == False:
                 return (0)
             image = self.frames[i].np_array.reshape((2048, 2048))
+            self.lock.acquire()
+            rescale_min=self.rescale_min
+            rescale_max = self.rescale_max
+            self.lock.release()
             [temp, self.image_min, self.image_max] = c_image.rescaleImage(image,
                                                                           False,
                                                                           False,
                                                                           False,
-                                                                          [self.rescale_min, self.rescale_max],
+                                                                          [rescale_min, rescale_max],
                                                                           None)
             qImg = QtGui.QImage(temp.data, 2048, 2048, QtGui.QImage.Format_Indexed8)
             pixmap01 = QtGui.QPixmap.fromImage(qImg)
             self.ui.livewindow.setPixmap(pixmap01)
+            if self.live_thread_flag == False:
+                return (0)
             time.sleep(sleep_time / 1000.0)
 
-            #stop = time.clock()
-            #print(str(stop-start))
     # when live button is clicked, set live flag to True or False, then live thread will start or stop
     def live_state_change(self):
         if self.ui.liveButton.isChecked():
+            #self.stop_running()
+            #self.start_running()
             self.start_living()
 
 
         else:
+            #self.stop_running()
+            #self.start_running()
             self.stop_living()
 
     def start_living(self):
@@ -232,7 +241,7 @@ class MainWindow:
             self.message.send_message("record","stop recording")
             self.stop_record()
             self.stop_running()
-            self.start_running()
+            #self.start_running()
 
 
         else:
@@ -249,7 +258,8 @@ class MainWindow:
             if self.record_thread_flag == False:
                 return (0)
             image = i.np_array.reshape((2048, 2048))
-            self.tiff.tinytiffwrite(image,self.file)
+            self.tiff.write_image(image)#use libtiff
+            #tifffile.imsave(self.filename, image) #use tifffile.py
 
     def start_record(self):
         self.filename = 'D:\\Data\\' + self.ui.name_text.text() + self.ui.name_num.text() + '.tif'
@@ -261,11 +271,10 @@ class MainWindow:
                 self.stop_record()
                 self.message.send_message("record","stop recording")
                 return 0
-                # self.tif = tiff.TiffWriter(filename,
-                #                          imagej=True)
         self.ui.recordButton.setText('stop')
-        self.tiff = tinytiffwriter.tinytiffwriter()
-        self.file = self.tiff.tinytiffopen(self.filename)
+        #self.tiff = tinytiffwriter.tinytiffwriter()#use tinytiffwriter.dll
+        #self.file = self.tiff.tinytiffopen(self.filename)
+        self.tiff = libtiff.TIFF.open(self.filename, mode='w')#use libtiff
         self.record_thread_flag = True
 
 
@@ -275,14 +284,12 @@ class MainWindow:
         self.ui.recordButton.setChecked(False)
         self.ui.recordButton.setText("record")
         try:
-            self.tiff.tinytiffclose(self.file)
+            self.tiff.close()#use libtiff
         except:
             pass
 
     def stageUi(self):
         self.ui.message_label.setText('initializing stage Gui')
-        #stage_=threading.Thread(target=Stage.Stage,args=(self.message,))
-        #stage_.start()
         example = Stage.Stage(self.message)
         self.ui.message_label.setText('stage Gui initialized')
 

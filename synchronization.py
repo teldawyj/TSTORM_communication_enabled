@@ -9,7 +9,7 @@ import threading
 import sys
 
 class Lines(module.Module):
-    def __init__(self,message,time_405=100,frames=3,cycles=0,exposure=20):
+    def __init__(self,message,time_405=0,frames=10,cycles=0,exposure=30):
         super().__init__(message)
         self.message=message
         self.read = np.int32()
@@ -25,15 +25,15 @@ class Lines(module.Module):
 
     def lists(self):
         self.list_405=[1]*self.time_405
-        self.list_405.extend([0]*self.frames*(self.exposure+12))
+        self.list_405.extend([0]*self.frames*(self.exposure+11))
 
 
         self.list_647=[0]*self.time_405
-        self.list_647.extend([1]*self.frames*(self.exposure+12))
+        self.list_647.extend([1]*self.frames*(self.exposure+11))
 
 
         self.camera_list=[0]*self.time_405
-        self.camera_list.extend(([1,1,1,1,1,1,1,1,1,1]+[0]*(self.exposure+2))*self.frames)
+        self.camera_list.extend(([1,1,1,1,1,1,1,1,1,1]+[0]*(self.exposure+1))*self.frames)
 
 
     def set_lines(self):
@@ -56,78 +56,55 @@ class Lines(module.Module):
             self.camera_list *= self.cycles
             self.task.CfgSampClkTiming("", 1000, DAQmx_Val_Rising, DAQmx_Val_FiniteSamps, len(self.list_405))
 
-            self.send_thread_flag=True
-            print("communication mode")
-
-
-
         data=[self.list_405,self.list_647,self.camera_list]
         data=np.array(data,dtype=np.uint8)
-
         self.task.WriteDigitalLines(data.shape[1], 0, 10.0, DAQmx_Val_GroupByChannel, data, None,None)
 
     def start(self):
         self.task.StartTask()
-        self.writing_thread = threading.Thread(target=self.lines_writing, name="writing_thread")
-        self.writing_thread.start()
+        if self.message.find_message('stage mode')=="stage mode":
+           self.stage_mode=True
+        #self.loop_thread = threading.Thread(target=self.loop, name="loop_thread")
+        #self.loop_thread.start()
+        self.loop()
 
-    def awaiting_message(self):
-        i=0
-        print(threading.get_ident(), "lines is waiting for message %d" % i)
-        while(self.await_thread_flag==True):
-            #print(threading.get_ident(),"lines is waiting for message %d"%i)
-            #i+=1
-            self.process_message()
+    def loop(self):
+        if self.stage_mode==True:
+            self.first_time=True
+            while (self.stage_mode==True):
+                self.task.IsTaskDone(ctypes.byref(self.done))
+
+                if self.done.value:
+                    if self.first_time==True:
+                        self.send_message()
+                        self.first_time=False
+
+                    self.process_message()
+                else:
+                    time.sleep(0.1)
 
 
     def process_message(self):
-        if self.message.find_message("camera")=="stop camera" or self.message.find_message("camera")=="stop camera do not stop stage":
-            self.await_thread_flag = False
-            self.send_thread_flag = True
+        if self.message.find_message("camera")=="stop camera" or \
+                self.message.find_message("camera")=="stop camera do not stop stage":
+            self.stage_mode = False
             self.message.send_message("lines","stop lines")
             self.message.send_message("camera state","stopped")
             self.message.send_message("camera", "waiting")
         elif self.message.find_message("lines") == "start lines":
             print(threading.get_ident(), "lines get starting message")
+            self.stop()
             self.set_lines()
-            self.send_thread_flag=True
-            self.start()
-            self.await_thread_flag = False
+            self.task.StartTask()
+            self.first_time=True
+            self.stage_mode = True
         else:
             time.sleep(0.1)
-
-    def lines_writing(self):
-        i = 0
-
-        while (self.send_thread_flag == True):
-            # if i==0:
-            print(threading.get_ident(), "lines is writing %d" % i)
-            i += 1
-            self.task.IsTaskDone(ctypes.byref(self.done))
-            if self.done.value:
-                self.send_thread_flag = False
-                self.stop()
-                print("lines stopped writing")
-                if self.message.find_message("camera")=="stop camera" or self.message.find_message("camera")=="stop camera do not stop stage":
-                    self.message.send_message("lines", "lines stopped")
-                    self.message.send_message("camera state","stopped")
-                    self.message.send_message("camera","waiting")
-
-
-                else:
-
-                    sending_thread = threading.Thread(target=self.send_message, name="sending thread")
-                    sending_thread.start()
-
-            else:
-                time.sleep(0.1)
 
     def send_message(self):
 
         self.message.send_message("lines", "lines stopped")
-        self.await_thread_flag = True
-        await_thread=threading.Thread(target=self.awaiting_message,name="awaiting thread")
-        await_thread.start()
+        self.stage_mode = True
         self.message.send_message("stage", "start stage")
 
 
@@ -135,12 +112,12 @@ class Lines(module.Module):
     def stop(self):
         self.task.StopTask()
         self.task.ClearTask()
-        pass
 
 
 
 if __name__=='__main__':
     app = QApplication(sys.argv)
     exa = Lines({})
+    exa.set_lines()
     exa.start()
     sys.exit(app.exec_())

@@ -56,7 +56,7 @@ class Stage(module.Module):
         self.piezo_timer.timeout.connect(lambda: self.piezoinfo())
         self.piezo_timer.start(20)
         self.ui.goButton.clicked.connect(lambda: self.GO())
-        self.ui.piezo_go.clicked.connect(lambda: self.piezo_Abs())
+        self.ui.piezo_go.clicked.connect(lambda: self.piezo_Abs(distance=float(self.ui.piezo_doublespinbox.text())))
         self.ui.zRel_button.clicked.connect(lambda: self.piezo_Rel(distance=float(self.ui.zReldoublespinbox.text())))
         self.ui.move_stage_in_record.clicked.connect(lambda:self.change_button())
 
@@ -64,35 +64,37 @@ class Stage(module.Module):
     def change_button(self):
         if self.ui.move_stage_in_record.isChecked():
             self.message.send_message("stage","stage awaiting")
-            self.awaiting_flag = True
+            self.message.send_message('stage mode','stage mode')
+            self.loop_flag = True
             self.move_distance = 0.0
+            self.position=self.mcl_handle.getPosition(3)
             self.ui.move_stage_in_record.setText("running")
-            self.awaiting_thread = threading.Thread(target=self.awaiting_message, name="await message")
-            self.awaiting_thread.start()
+            self.loop_thread = threading.Thread(target=self.loop, name="loop thread")
+            self.loop_thread.start()
         else:
-            self.awaiting_flag = False
+            self.loop_flag = False
+            self.message.send_message("stage mode","no mode")
+            self.message.send_message("stage","stage stopped")
             self.ui.move_stage_in_record.setText("set")
 
 
-    def awaiting_message(self):
-        i=0
-        print(threading.get_ident(), "stage is waiting for message %d" % i)
-        while(self.ui.move_stage_in_record.isChecked() and self.awaiting_flag==True):
-            #print(threading.get_ident(),"stage is waiting for message %d"%i)
-            #i+=1
+    def loop(self):
+        print(threading.get_ident(), " stage is started")
+        while(self.loop_flag==True):
             if self.message.find_message("camera")=="stop camera":
                 print("stage action over")
-                self.awaiting_flag=False
+                self.loop_flag=False
+                self.ui.move_stage_in_record.setChecked(False)
+                self.ui.move_stage_in_record.setText("Set")
                 self.message.send_message("stage","stage stopped")
             elif self.message.find_message("camera")=="stop camera do not stop stage":
-                print("stage waiting for recording")
-                #self.awaiting_flag = False
+                self.piezo_Abs(self.position)
+                self.move_distance = 0.0
+                time.sleep(1)
                 self.message.send_message("stage", "stage stopped")
             elif self.message.find_message("stage")=="start stage":
-                self.awaiting_flag = False
                 print(threading.get_ident(),"stage get starting message")
-                send_thread=threading.Thread(target=self.send_message())
-                send_thread.start()
+                self.send_message()
             else:
                 time.sleep(0.1)
 
@@ -101,62 +103,60 @@ class Stage(module.Module):
         if self.move_distance<float(self.ui.record_move_range.text()):
             self.piezo_Rel(distance=1.00)
             time.sleep(0.1)
-            self.move_distance+=1
+            self.move_distance+=1.0
         else:
             self.message.send_message("camera", "stop camera")
             self.message.send_message("stage","stop stage")
+            self.message.send_message('stage mode','no mode')
             self.ui.move_stage_in_record.setChecked(False)
-            self.awaiting_flag = False
+            self.loop_flag = False
             self.ui.move_stage_in_record.setText("Set")
             return(0)
         self.message.send_message("stage", "stage stopped")
         self.message.send_message("lines", "start lines")
-        time.sleep(0.5)
-        self.awaiting_flag = True
-        awaiting_thread=threading.Thread(target=self.awaiting_message)
-        awaiting_thread.start()
+        self.loop_flag = True
 
 
 
     def ZUP(self):
-        self.handle_z.mRel(.1)
+        self.handle_z.mRel(.01)
 
     def ZUPL(self):
-        self.handle_z.mRel(.5)
+        self.handle_z.mRel(.05)
 
     def ZDOWN(self):
-        self.handle_z.mRel(-.1)
+        self.handle_z.mRel(-.01)
 
     def ZDOWNL(self):
-        self.handle_z.mRel(-.5)
+        self.handle_z.mRel(-.05)
 
     def XUP(self):
-        self.handle_y.mRel(.1)
+        self.handle_y.mRel(.01)
         pass
 
     def XUPL(self):
-        self.handle_y.mRel(.5)
+        self.handle_y.mRel(.05)
         pass
 
     def XDOWN(self):
-        self.handle_y.mRel(-.1)
+        self.handle_y.mRel(-.01)
         pass
 
     def XDOWNL(self):
-        self.handle_y.mRel(-.5)
+        self.handle_y.mRel(-.05)
         pass
 
     def YLEFT(self):
-        self.handle_x.mRel(-.1)
+        self.handle_x.mRel(-.01)
 
     def YLEFTL(self):
-        self.handle_x.mRel(-.5)
+        self.handle_x.mRel(-.05)
 
     def YRIGHT(self):
-        self.handle_x.mRel(.1)
+        self.handle_x.mRel(.01)
 
     def YRIGHTL(self):
-        self.handle_x.mRel(.5)
+        self.handle_x.mRel(.05)
 
     def HOME(self):
         self.handle_x.mAbs(0)
@@ -205,11 +205,16 @@ class Stage(module.Module):
         self.handle_z.cleanUpAPT()
         self.mcl_handle.shutDown()
 
-    def piezo_Abs(self):
-        self.mcl_handle.moveTo(3,float(self.ui.piezo_doublespinbox.text()))
+    def piezo_Abs(self,distance):
+        self.mcl_handle.moveTo(3,distance)
 
     def piezo_Rel(self,distance=0.0):
-        self.mcl_handle.moveTo(3,distance+self.mcl_handle.getPosition(3))
+        position=self.mcl_handle.getPosition(3)
+        self.mcl_handle.moveTo(3,distance+position)
+        #self.mcl_handle.moveTo(3, distance + position)
+        #time.sleep(0.1)
+        #small=position+distance-self.mcl_handle.getPosition(3)
+        #self.mcl_handle.moveTo(3, small + self.mcl_handle.getPosition(3))
 
     def piezoinfo(self):
         self.ui.piezo_postext.setText("z_posi=" + str(format(self.mcl_handle.getPosition(3), '.3f')))
