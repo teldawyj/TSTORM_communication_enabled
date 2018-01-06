@@ -42,7 +42,7 @@ class MainWindow:
         self.lock = threading.Lock()
         self.hcam = cam.HamamatsuCameraMR(camera_id=0)
         '''try:
-            self.hcam.setPropertyValue("trigger_source",2)
+            self.hcam.setPropertyValue("trigger_source",3)
         except:
             print("camera set external trigger mode failed")
         try:

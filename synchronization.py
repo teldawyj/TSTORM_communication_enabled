@@ -25,15 +25,15 @@ class Lines(module.Module):
 
     def lists(self):
         self.list_405=[1]*self.time_405
-        self.list_405.extend([0]*self.frames*(self.exposure+11))
+        self.list_405.extend([0]*self.frames*(self.exposure))
 
 
         self.list_647=[0]*self.time_405
-        self.list_647.extend([1]*self.frames*(self.exposure+11))
+        self.list_647.extend([1]*self.frames*(self.exposure))
 
 
         self.camera_list=[0]*self.time_405
-        self.camera_list.extend(([1,1,1,1,1,1,1,1,1,1]+[0]*(self.exposure+1))*self.frames)
+        self.camera_list.extend(([1,1,1,1,1]+[0]*(self.exposure-5))*self.frames)
 
 
     def set_lines(self):
