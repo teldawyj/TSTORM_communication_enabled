@@ -9,12 +9,12 @@ import threading
 import sys
 
 class Lines(module.Module):
-    def __init__(self,message,time_405=0,frames=10,cycles=0,exposure=30):
+    def __init__(self,message,time_405=0,frames=10,cycles=0,exposure=20):
         super().__init__(message)
         self.message=message
+        self.stage_mode =False
+        self.loop_flag = None
         self.read = np.int32()
-        self.send_thread_flag = False
-        self.process_thread_flag = False
         self.data = np.zeros(1, dtype=np.uint32)
         self.time_405=int(time_405)
         self.frames=int(frames)
@@ -46,15 +46,13 @@ class Lines(module.Module):
 
         if self.cycles==0:
             self.task.CfgSampClkTiming("", 1000, DAQmx_Val_Rising, DAQmx_Val_ContSamps, 1000)
-            self.send_thread_flag = False
-
-
 
         else:
             self.list_405 *= self.cycles
             self.list_647 *= self.cycles
             self.camera_list *= self.cycles
             self.task.CfgSampClkTiming("", 1000, DAQmx_Val_Rising, DAQmx_Val_FiniteSamps, len(self.list_405))
+            self.loop_flag = True
 
         data=[self.list_405,self.list_647,self.camera_list]
         data=np.array(data,dtype=np.uint8)
@@ -62,24 +60,32 @@ class Lines(module.Module):
 
     def start(self):
         self.task.StartTask()
+
         if self.message.find_message('stage mode')=="stage mode":
            self.stage_mode=True
-        #self.loop_thread = threading.Thread(target=self.loop, name="loop_thread")
-        #self.loop_thread.start()
-        self.loop()
+        self.loop_thread = threading.Thread(target=self.loop, name="loop_thread")
+        self.loop_thread.start()
+        #self.loop()
 
     def loop(self):
-        if self.stage_mode==True:
             self.first_time=True
-            while (self.stage_mode==True):
+            while (self.loop_flag==True):
                 self.task.IsTaskDone(ctypes.byref(self.done))
 
                 if self.done.value:
-                    if self.first_time==True:
-                        self.send_message()
-                        self.first_time=False
-
-                    self.process_message()
+                    if self.stage_mode==True:
+                        if self.first_time==True:
+                            self.send_message()
+                            self.first_time=False
+                        self.process_message()
+                    else:
+                        self.loop_flag=False
+                        self.stop()
+                        #self.message.send_message("lines", "stop lines")
+                        self.message.send_message("lines", "lines stopped")
+                        self.message.send_message("camera","stop camera")
+                        self.message.send_message("camera state", "stopped")
+                        self.message.send_message("camera", "waiting")
                 else:
                     time.sleep(0.1)
 
@@ -88,7 +94,9 @@ class Lines(module.Module):
         if self.message.find_message("camera")=="stop camera" or \
                 self.message.find_message("camera")=="stop camera do not stop stage":
             self.stage_mode = False
-            self.message.send_message("lines","stop lines")
+            self.loop_flag=False
+            self.stop()
+            #self.message.send_message("lines","stop lines")
             self.message.send_message("camera state","stopped")
             self.message.send_message("camera", "waiting")
         elif self.message.find_message("lines") == "start lines":
@@ -97,7 +105,7 @@ class Lines(module.Module):
             self.set_lines()
             self.task.StartTask()
             self.first_time=True
-            self.stage_mode = True
+            #self.stage_mode = True
         else:
             time.sleep(0.1)
 

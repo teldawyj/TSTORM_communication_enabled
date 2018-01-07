@@ -41,15 +41,10 @@ class MainWindow:
         self.file=None
         self.lock = threading.Lock()
         self.hcam = cam.HamamatsuCameraMR(camera_id=0)
-        '''try:
-            self.hcam.setPropertyValue("trigger_source",3)
-        except:
-            print("camera set external trigger mode failed")
-        try:
-            self.hcam.setPropertyValue("trigger_polarity",2)
-            #print(self.hcam.getPropertyText("trigger_polarity"))
-        except:
-            print("camera set positive polarity failed")'''
+        #self.hcam.setPropertyValue("trigger_source", 2)
+        #self.hcam.setPropertyValue("trigger_active", 3)
+        #self.hcam.setPropertyValue("trigger_polarity", 2)
+
 
         self.ui.shutterButton.clicked.connect(lambda: self.shutterUi())
         self.ui.AOTFButton.clicked.connect(lambda: self.aotfUi())
@@ -258,23 +253,24 @@ class MainWindow:
             if self.record_thread_flag == False:
                 return (0)
             image = i.np_array.reshape((2048, 2048))
-            self.tiff.write_image(image)#use libtiff
+            #self.tiff.write_image(image)#use libtiff
+            self.tiff.tinytiffwrite(image,self.file)
             #tifffile.imsave(self.filename, image) #use tifffile.py
 
     def start_record(self):
         self.filename = 'D:\\Data\\' + self.ui.name_text.text() + self.ui.name_num.text() + '.tif'
-        if os.path.exists(self.filename):
+        '''if os.path.exists(self.filename):
             message, ok = QInputDialog.getText(self.ui, "file exists", "continue will cover the old file",
                                                QLineEdit.Normal,
                                                "Yes, please cover the old file")
             if not ok:
                 self.stop_record()
                 self.message.send_message("record","stop recording")
-                return 0
+                return 0'''
         self.ui.recordButton.setText('stop')
-        #self.tiff = tinytiffwriter.tinytiffwriter()#use tinytiffwriter.dll
-        #self.file = self.tiff.tinytiffopen(self.filename)
-        self.tiff = libtiff.TIFF.open(self.filename, mode='w')#use libtiff
+        self.tiff = tinytiffwriter.tinytiffwriter()#use tinytiffwriter.dll
+        self.file = self.tiff.tinytiffopen(self.filename,16,2048,2048)
+        #self.tiff = libtiff.TIFF.open(self.filename, mode='w')#use libtiff
         self.record_thread_flag = True
 
 
@@ -284,7 +280,8 @@ class MainWindow:
         self.ui.recordButton.setChecked(False)
         self.ui.recordButton.setText("record")
         try:
-            self.tiff.close()#use libtiff
+            #self.tiff.close()#use libtiff
+            self.tiff.tinytiffclose(self.file)
         except:
             pass
 

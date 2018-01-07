@@ -86,12 +86,13 @@ class Stage(module.Module):
                 self.loop_flag=False
                 self.ui.move_stage_in_record.setChecked(False)
                 self.ui.move_stage_in_record.setText("Set")
-                self.message.send_message("stage","stage stopped")
+                self.message.send_message("stage","action stage stopped")
             elif self.message.find_message("camera")=="stop camera do not stop stage":
+                #print("still in the siop mode")
                 self.piezo_Abs(self.position)
                 self.move_distance = 0.0
                 time.sleep(1)
-                self.message.send_message("stage", "stage stopped")
+                #self.message.send_message("stage", " record stage stopped")
             elif self.message.find_message("stage")=="start stage":
                 print(threading.get_ident(),"stage get starting message")
                 self.send_message()
@@ -104,17 +105,18 @@ class Stage(module.Module):
             self.piezo_Rel(distance=1.00)
             time.sleep(0.1)
             self.move_distance+=1.0
+            self.message.send_message("stage", "lines stage stopped")
+            self.message.send_message("lines", "start lines")
+            self.loop_flag = True
         else:
+            print("stage move action finished")
             self.message.send_message("camera", "stop camera")
             self.message.send_message("stage","stop stage")
             self.message.send_message('stage mode','no mode')
             self.ui.move_stage_in_record.setChecked(False)
             self.loop_flag = False
             self.ui.move_stage_in_record.setText("Set")
-            return(0)
-        self.message.send_message("stage", "stage stopped")
-        self.message.send_message("lines", "start lines")
-        self.loop_flag = True
+
 
 
 
