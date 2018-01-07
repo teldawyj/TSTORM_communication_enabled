@@ -41,9 +41,18 @@ class MainWindow:
         self.file=None
         self.lock = threading.Lock()
         self.hcam = cam.HamamatsuCameraMR(camera_id=0)
-        #self.hcam.setPropertyValue("trigger_source", 2)
-        #self.hcam.setPropertyValue("trigger_active", 3)
-        #self.hcam.setPropertyValue("trigger_polarity", 2)
+
+
+        self.hcam.setPropertyValue("trigger_source", 2)
+        #print(self.hcam.getPropertyValue("trigger_source"))
+        self.hcam.setPropertyValue("trigger_active", 1)
+        #print(self.hcam.getPropertyValue("trigger_active"))
+        self.hcam.setPropertyValue("trigger_polarity", 2)
+        #self.hcam.setPropertyValue("trigger_mode",6)
+        #print(self.hcam.getPropertyValue("trigger_connector"))
+        for i in self.hcam.getProperties():
+            print(i,self.hcam.getPropertyValue(i),self.hcam.getPropertyText(i))
+        #self.hcam.startAcquisition()
 
 
         self.ui.shutterButton.clicked.connect(lambda: self.shutterUi())
@@ -64,8 +73,8 @@ class MainWindow:
 
             [self.frames, dims] = self.hcam.getFrames()#FIXME: cannot get buffer when external triger
             #print("frames number=  " ,len(self.frames))
-            '''if len(self.frames)==0:
-                #self.hcam.stopAcquisition()
+            if len(self.frames)==0:
+                self.hcam.stopAcquisition()
                 self.getbuffer_timer.stop()
                 if self.ui.recordButton.isChecked():
                     self.ui.recordButton.setChecked(False)
@@ -73,7 +82,7 @@ class MainWindow:
                     self.record_thread_flag=False
                 self.ui.set_parameter.setText("start camera")
                 self.ui.set_parameter.setChecked(False)
-                return(0)'''
+                return(0)
             self.ui.message_label.setText("current cycle time is : " + str(self.cycle / 1000.0))
             self.ui.message_label.setText("cycle time: " + str(self.cycle / 1000.0)+"frames : " + str(len(self.frames))
                                           )
@@ -117,7 +126,7 @@ class MainWindow:
             self.ui.set_parameter.setText("stop camera")
             self.message.send_message("camera state", "started")
             self.hcam.startAcquisition()
-            self.hcam.setPropertyValue('exposure_time', float(self.ui.recor_exp_t_doublespinbox.text()) / 1000.0)
+            #self.hcam.setPropertyValue('exposure_time', float(self.ui.recor_exp_t_doublespinbox.text()) / 1000.0)
             cycle = float(self.ui.doublespinbox_405.text()) + \
                     float(self.ui.frames_doublespinbox.text()) * (float(self.ui.recor_exp_t_doublespinbox.text()) + 12)
             self.getbuffer_timer.start(cycle)
@@ -137,7 +146,7 @@ class MainWindow:
             self.ui.set_parameter.setChecked(True)
             self.ui.set_parameter.setText("stop camera")
             self.hcam.startAcquisition()
-            self.hcam.setPropertyValue('exposure_time', float(self.ui.exp_t_doublespinbox.text()) / 1000.0)
+            #self.hcam.setPropertyValue('exposure_time', float(self.ui.exp_t_doublespinbox.text()) / 1000.0)
             self.cycle = float(self.ui.doublespinbox_405.text()) + \
                     float(self.ui.frames_doublespinbox.text()) * (float(self.ui.exp_t_doublespinbox.text()) + 12)
             self.getbuffer_timer.start(self.cycle)
