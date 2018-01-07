@@ -9,7 +9,7 @@ import threading
 import sys
 
 class Lines(module.Module):
-    def __init__(self,message,time_405=0,frames=10,cycles=0,exposure=20):
+    def __init__(self,message,time_405=1000,frames=100,cycles=0,exposure=20):
         super().__init__(message)
         self.message=message
         self.stage_mode =False
@@ -19,7 +19,7 @@ class Lines(module.Module):
         self.time_405=int(time_405)
         self.frames=int(frames)
         self.cycles=int(cycles)
-        self.exposure=int(exposure)
+        self.exposure=int(exposure)+12
         self.done=bool32(0)
 
 
@@ -35,6 +35,8 @@ class Lines(module.Module):
         self.camera_list=[0]*self.time_405
         self.camera_list.extend(([1,1,1,1,1]+[0]*(self.exposure-5))*self.frames)
 
+        self.blk_list=[1]*len(self.list_647)
+
 
     def set_lines(self):
         self.task = Task()
@@ -42,6 +44,7 @@ class Lines(module.Module):
         self.task.CreateDOChan("/Dev1/port0/line1", "405", DAQmx_Val_ChanForAllLines)
         self.task.CreateDOChan("/Dev1/port0/line2", "647", DAQmx_Val_ChanForAllLines)
         self.task.CreateDOChan("/Dev1/port0/line3", "camera", DAQmx_Val_ChanForAllLines)
+        self.task.CreateDOChan("/Dev1/port0/line4", "BLK", DAQmx_Val_ChanForAllLines)
 
 
         if self.cycles==0:
@@ -51,18 +54,23 @@ class Lines(module.Module):
             self.list_405 *= self.cycles
             self.list_647 *= self.cycles
             self.camera_list *= self.cycles
+            self.blk_list*=self.cycles
+            self.list_405 +=[0]
+            self.list_647 +=[0]
+            self.camera_list +=[0]
+            self.blk_list +=[0]
             self.task.CfgSampClkTiming("", 1000, DAQmx_Val_Rising, DAQmx_Val_FiniteSamps, len(self.list_405))
             self.loop_flag = True
 
-        data=[self.list_405,self.list_647,self.camera_list]
+        data=[self.list_405,self.list_647,self.camera_list,self.blk_list]
         data=np.array(data,dtype=np.uint8)
         self.task.WriteDigitalLines(data.shape[1], 0, 10.0, DAQmx_Val_GroupByChannel, data, None,None)
 
     def start(self):
         self.task.StartTask()
 
-        if self.message.find_message('stage mode')=="stage mode":
-           self.stage_mode=True
+        #if self.message.find_message('stage mode')=="stage mode":
+        #   self.stage_mode=True
         self.loop_thread = threading.Thread(target=self.loop, name="loop_thread")
         self.loop_thread.start()
         #self.loop()
