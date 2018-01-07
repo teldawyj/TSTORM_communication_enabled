@@ -9,7 +9,7 @@ import threading
 import sys
 
 class Lines(module.Module):
-    def __init__(self,message,time_405=1000,amp_405=0, amp_647=0,frames=100,cycles=0,exposure=20):
+    def __init__(self,message,time_405=100,amp_405=0.1, amp_647=0.1,frames=20,cycles=0,exposure=40):
         super().__init__(message)
         self.message=message
         self.stage_mode =False
@@ -21,7 +21,7 @@ class Lines(module.Module):
         self.amp_647=amp_647
         self.frames=int(frames)
         self.cycles=int(cycles)
-        self.exposure=int(exposure)+12
+        self.exposure=int(exposure)+11
         self.done=bool32(0)
 
 
