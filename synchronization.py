@@ -9,7 +9,7 @@ import threading
 import sys
 
 class Lines(module.Module):
-    def __init__(self,message,time_405=1000,frames=100,cycles=0,exposure=20):
+    def __init__(self,message,time_405=1000,amp_405=0, amp_647=0,frames=100,cycles=0,exposure=20):
         super().__init__(message)
         self.message=message
         self.stage_mode =False
@@ -17,6 +17,8 @@ class Lines(module.Module):
         self.read = np.int32()
         self.data = np.zeros(1, dtype=np.uint32)
         self.time_405=int(time_405)
+        self.amp_405=amp_405
+        self.amp_647=amp_647
         self.frames=int(frames)
         self.cycles=int(cycles)
         self.exposure=int(exposure)+12
@@ -24,12 +26,12 @@ class Lines(module.Module):
 
 
     def lists(self):
-        self.list_405=[1]*self.time_405
+        self.list_405=[self.amp_405]*self.time_405
         self.list_405.extend([0]*self.frames*(self.exposure))
 
 
         self.list_647=[0]*self.time_405
-        self.list_647.extend([1]*self.frames*(self.exposure))
+        self.list_647.extend([self.amp_647]*self.frames*(self.exposure))
 
 
         self.camera_list=[0]*self.time_405
@@ -39,16 +41,19 @@ class Lines(module.Module):
 
 
     def set_lines(self):
-        self.task = Task()
+        self.Dtask = Task()
+        self.Atask=Task()
         self.lists()
-        self.task.CreateDOChan("/Dev1/port0/line1", "405", DAQmx_Val_ChanForAllLines)
-        self.task.CreateDOChan("/Dev1/port0/line2", "647", DAQmx_Val_ChanForAllLines)
-        self.task.CreateDOChan("/Dev1/port0/line3", "camera", DAQmx_Val_ChanForAllLines)
-        self.task.CreateDOChan("/Dev1/port0/line4", "BLK", DAQmx_Val_ChanForAllLines)
+        self.Atask.CreateAOChan("/Dev1/ao2", "405", DAQmx_Val_ChanForAllLines)
+        self.Atask.CreateAOChan("/Dev1/ao3", "647", DAQmx_Val_ChanForAllLines)
+        self.Dtask.CreateDOChan("/Dev1/port0/line3", "camera", DAQmx_Val_ChanForAllLines)
+        self.Dtask.CreateDOChan("/Dev1/port0/line4", "BLK", DAQmx_Val_ChanForAllLines)
 
 
         if self.cycles==0:
-            self.task.CfgSampClkTiming("", 1000, DAQmx_Val_Rising, DAQmx_Val_ContSamps, 1000)
+            self.Atask.CfgSampClkTiming("", 1000, DAQmx_Val_Rising, DAQmx_Val_ContSamps, 1000)
+            self.Dtask.CfgSampClkTiming("", 1000, DAQmx_Val_Rising, DAQmx_Val_ContSamps, 1000)
+
 
         else:
             self.list_405 *= self.cycles
@@ -59,15 +64,22 @@ class Lines(module.Module):
             self.list_647 +=[0]
             self.camera_list +=[0]
             self.blk_list +=[0]
-            self.task.CfgSampClkTiming("", 1000, DAQmx_Val_Rising, DAQmx_Val_FiniteSamps, len(self.list_405))
+            self.Dtask.CfgSampClkTiming("", 1000, DAQmx_Val_Rising, DAQmx_Val_FiniteSamps, len(self.list_405))
+            self.Atask.CfgSampClkTiming("", 1000, DAQmx_Val_Rising, DAQmx_Val_FiniteSamps,
+                                        len(self.list_405))
             self.loop_flag = True
 
-        data=[self.list_405,self.list_647,self.camera_list,self.blk_list]
-        data=np.array(data,dtype=np.uint8)
-        self.task.WriteDigitalLines(data.shape[1], 0, 10.0, DAQmx_Val_GroupByChannel, data, None,None)
+        Ddata=[self.camera_list,self.blk_list]
+        Ddata=np.array(Ddata,dtype=np.uint8)
+        Adata=[self.list_405,self.list_647]
+        Adata = np.float64(Adata)
+        self.Dtask.WriteDigitalLines(Ddata.shape[1], 0, 10.0, DAQmx_Val_GroupByChannel, Ddata, None,None)
+        self.Atask.WriteAnalogF64(Ddata.shape[1], 0, 10.0, DAQmx_Val_GroupByChannel, Adata, None, None)
+
 
     def start(self):
-        self.task.StartTask()
+        self.Atask.StartTask()
+        self.Dtask.StartTask()
 
         #if self.message.find_message('stage mode')=="stage mode":
         #   self.stage_mode=True
@@ -78,7 +90,7 @@ class Lines(module.Module):
     def loop(self):
             self.first_time=True
             while (self.loop_flag==True):
-                self.task.IsTaskDone(ctypes.byref(self.done))
+                self.Dtask.IsTaskDone(ctypes.byref(self.done))
 
                 if self.done.value:
                     if self.stage_mode==True:
@@ -95,7 +107,7 @@ class Lines(module.Module):
                         self.message.send_message("camera state", "stopped")
                         self.message.send_message("camera", "waiting")
                 else:
-                    time.sleep(0.1)
+                    self.Dtask.WaitUntilTaskDone(-1)
 
 
     def process_message(self):
@@ -111,7 +123,9 @@ class Lines(module.Module):
             print(threading.get_ident(), "lines get starting message")
             self.stop()
             self.set_lines()
-            self.task.StartTask()
+            time.sleep(0.01)
+            self.Dtask.StartTask()
+            self.Atask.StartTask()
             self.first_time=True
             #self.stage_mode = True
         else:
@@ -126,8 +140,10 @@ class Lines(module.Module):
 
 
     def stop(self):
-        self.task.StopTask()
-        self.task.ClearTask()
+        self.Dtask.StopTask()
+        self.Dtask.ClearTask()
+        self.Atask.StopTask()
+        self.Atask.ClearTask()
 
 
 
