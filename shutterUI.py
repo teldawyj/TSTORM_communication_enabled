@@ -13,7 +13,7 @@ class shutterGui(QtWidgets.QWidget):
         self.setGeometry(500, 500, 200, 50)
         self.setWindowTitle("shutter")
         self.gridGroupBox = QGroupBox("shutter control",self)
-
+        label=QLabel('shutter state',self)
         self.button_state = QPushButton('ON', self.gridGroupBox)
         self.button_state.setCheckable(True)
 
@@ -24,6 +24,7 @@ class shutterGui(QtWidgets.QWidget):
 
         layout = QGridLayout(self)
         layout.setSpacing(10)
+        layout.addWidget(label, 1, 0)
         layout.addWidget(self.button_state, 1, 1)
         layout.addWidget(self.range_label,2,0)
         layout.addWidget(self.textbox, 2, 1)
