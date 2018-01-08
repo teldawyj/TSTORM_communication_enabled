@@ -263,7 +263,7 @@ class MainWindow:
         self.tiff = tinytiffwriter.tinytiffwriter()#use tinytiffwriter.dll
         self.file = self.tiff.tinytiffopen(self.filename,16,2048,2048)
         self.ui.name_num.setValue(int(self.ui.name_num.text())+1)
-        #self.tiff = libtiff.TIFF.open(self.filename, mode='w')#use libtiff
+        #self.tiff = libtiff.TIFF.open(self.filename, mode='w8')#use libtiff
         self.record_thread_flag = True
 
 
