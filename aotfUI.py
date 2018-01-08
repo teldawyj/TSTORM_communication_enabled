@@ -29,7 +29,6 @@ class aotfGui(QWidget):
         self.textbox_f1 = QLineEdit(self)
         self.textbox_f1.setText('77.5')
         self.textbox_f2 = QLineEdit(self)
-        self.textbox_f2.setText('141.85')
         self.textbox_f3 = QLineEdit(self)
         self.textbox_f4 = QLineEdit(self)
         self.textbox_f5 = QLineEdit(self)
@@ -55,7 +54,7 @@ class aotfGui(QWidget):
         self.button_run7.setCheckable(True)
         self.button_run8.setCheckable(True)
 
-        self.button_analog=QPushButton('analog ON',self)
+        self.button_analog=QPushButton('internal',self)
         self.button_analog.setCheckable(True)
 
         self.textbox_a1 = QLineEdit(self)

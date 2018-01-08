@@ -49,8 +49,10 @@ class Lines(module.Module):
 
         if self.cycles==0:
             self.task.CfgSampClkTiming("", 1000, DAQmx_Val_Rising, DAQmx_Val_ContSamps, 1000)
+            self.message.send_message('illumination','continuous')
 
         else:
+            self.message.send_message('illumination', 'finite')
             self.list_405 *= self.cycles
             self.list_647 *= self.cycles
             self.camera_list *= self.cycles
@@ -69,11 +71,10 @@ class Lines(module.Module):
     def start(self):
         self.task.StartTask()
 
-        #if self.message.find_message('stage mode')=="stage mode":
-        #   self.stage_mode=True
+        if self.message.find_message('stage mode')=="stage mode":
+           self.stage_mode=True
         self.loop_thread = threading.Thread(target=self.loop, name="loop_thread")
         self.loop_thread.start()
-        #self.loop()
 
     def loop(self):
             self.first_time=True
@@ -89,7 +90,6 @@ class Lines(module.Module):
                     else:
                         self.loop_flag=False
                         self.stop()
-                        #self.message.send_message("lines", "stop lines")
                         self.message.send_message("lines", "lines stopped")
                         self.message.send_message("camera","stop camera")
                         self.message.send_message("camera state", "stopped")
