@@ -9,7 +9,7 @@ import threading
 import sys
 
 class Lines(module.Module):
-    def __init__(self,message,time_405=1000,frames=100,cycles=0,exposure=20):
+    def __init__(self,message,time_405=500,frames=20,cycles=0,exposure=20):
         super().__init__(message)
         self.message=message
         self.stage_mode =False
